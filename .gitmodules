@@ -1,0 +1,9 @@
+[submodule "cymric"]
+	path = cymric
+	url = https://github.com/catid/cymric.git
+[submodule "libcat"]
+	path = libcat
+	url = https://github.com/catid/libcat.git
+[submodule "snowshoe"]
+	path = snowshoe
+	url = https://github.com/catid/snowshoe.git
