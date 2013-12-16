@@ -48,11 +48,11 @@ extern int _tabby_init(int expected_version);
 #define tabby_init() _tabby_init(TABBY_VERSION)
 
 typedef struct {
-	char internal[96];
+	char internal[68 + 32 + 64 + 32 + 4];
 } tabby_client;
 
 typedef struct {
-	char internal[96 + 96];
+	char internal[68 + 32 + 32 + 64 + 32 + 64 + 4 + 32 + 64 + 68 + 4];
 } tabby_server;
 
 /*
