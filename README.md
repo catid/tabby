@@ -36,7 +36,7 @@ Signatures:
 One-round EC-DH with forward secrecy:
 
 + Tabby server handshake: `143180` median cycles, `54.1224` avg usec
-+ Tabby client handshake: `205944` median cycles, 77.7556` avg usec
++ Tabby client handshake: `205944` median cycles, `77.7556` avg usec
 
 Each of these operations takes roughly 2-3 usec longer than the Snowshoe math
 routines they are based on.
