@@ -1,5 +1,5 @@
 # Tabby
-### Key Agreement Protocol
+### Key Agreement and Signatures
 
 The Tabby key agreement protocol is designed for the situation where a client
 is attempting to connect to a server it has not connected to before.  After the
