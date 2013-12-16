@@ -64,22 +64,39 @@ typedef struct {
 extern void tabby_server_gen(tabby_server *S, const void *seed, int seed_bytes);
 
 /*
- * Returns the public key for a Tabby server object
+ * Generate a Tabby client object
+ *
+ * You may optionally provide extra random number data as a seed to improve
+ * the quality of the generated keys; otherwise pass NULL for seed.
  */
-extern void tabby_get_public_key(tabby_server *S, char public_key[64]);
+extern void tabby_client_gen(tabby_client *C, const void *seed, int seed_bytes, char client_request[96]);
+
+/*
+ * Returns the public key for a Tabby server object
+ *
+ * Returns 0 on success.
+ * Returns non-zero if the input data is invalid.
+ */
+extern int tabby_get_public_key(tabby_server *S, char public_key[64]);
 
 /*
  * Save a Tabby server object
+ *
+ * Returns 0 on success.
+ * Returns non-zero if the input data is invalid.
  */
-extern void tabby_server_save(tabby_server *S, char server_data[64]);
+extern int tabby_server_save(tabby_server *S, char server_data[64]);
 
 /*
  * Load a Tabby server object
  *
  * You may optionally provide extra random number data as a seed to improve
  * the quality of the generated keys; otherwise pass NULL for seed.
+ *
+ * Returns 0 on success.
+ * Returns non-zero if the input data is invalid.
  */
-extern void tabby_server_load(tabby_server *S, const void *seed, int seed_bytes, const char server_data[64]);
+extern int tabby_server_load(tabby_server *S, const void *seed, int seed_bytes, const char server_data[64]);
 
 /*
  * Sign a message using EdDSA
@@ -112,20 +129,12 @@ extern int tabby_verify(const void *message, int bytes, const char public_key[64
 extern int tabby_server_rekey(tabby_server *S, const void *seed, int seed_bytes);
 
 /*
- * Generate a Tabby client object
- *
- * You may optionally provide extra random number data as a seed to improve
- * the quality of the generated keys; otherwise pass NULL for seed.
- */
-extern void tabby_client_gen(tabby_client *C, const void *seed, int seed_bytes, char client_request[96]);
-
-/*
  * Process client request
  *
  * Returns 0 on success.
  * Returns non-zero if the input data is invalid.
  */
-extern int tabby_server_handshake(tabby_server *S, const const client_request[96], char server_response[128], char secret_key[32]);
+extern int tabby_server_handshake(tabby_server *S, const char client_request[96], char server_response[128], char secret_key[32]);
 
 /*
  * Process server response
@@ -134,6 +143,14 @@ extern int tabby_server_handshake(tabby_server *S, const const client_request[96
  * Returns non-zero if the input data is invalid.
  */
 extern int tabby_client_handshake(tabby_client *C, const char server_public_key[64], const char server_response[128], char secret_key[32]);
+
+/*
+ * Securely erase an object from memory
+ *
+ * When you are done with any of the Tabby objects, including secret keys,
+ * be sure to erase them with this function.
+ */
+extern void tabby_erase(void *object, int bytes);
 
 #ifdef __cplusplus
 }

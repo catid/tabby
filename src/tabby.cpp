@@ -26,9 +26,13 @@
 	POSSIBILITY OF SUCH DAMAGE.
 */
 
+#include "tabby.h"
 #include "snowshoe.h"
 #include "cymric.h"
 #include "blake2.h"
+
+#include "Platform.hpp"
+using namespace cat;
 
 static bool m_initialized = false;
 
@@ -50,9 +54,9 @@ typedef struct {
 	u32 flag;
 
 	// Rekey thread data:
-	volatile char private_rekey[32];
-	volatile char public_rekey[64];
-	volatile cymric_rng rng_rekey;
+	char private_rekey[32];
+	char public_rekey[64];
+	cymric_rng rng_rekey;
 	volatile u32 flag_rekey;
 } server_internal;
 
@@ -63,7 +67,7 @@ static const u32 FLAG_REKEY_DONE = 2;
 static void generate_key(cymric_rng *rng, char private_key[32], char public_key[64]) {
 	do {
 		char key[64];
-		cymric_generate(rng, key, 64);
+		cymric_random(rng, key, 64);
 
 		snowshoe_mod_q(key, private_key);
 	} while (snowshoe_mul_gen(private_key, public_key));
@@ -100,7 +104,7 @@ void tabby_server_gen(tabby_server *S, const void *seed, int seed_bytes) {
 	generate_key(&state->rng, state->private_key, state->public_key);
 	generate_key(&state->rng, state->private_ephemeral, state->public_ephemeral);
 
-	cymric_generate(&state->rng, state->sign_key);
+	cymric_random(&state->rng, state->sign_key, 32);
 
 	state->flag = FLAG_INIT;
 	state->flag_rekey = FLAG_NEED_REKEY;
@@ -113,7 +117,7 @@ void tabby_client_gen(tabby_client *C, const void *seed, int seed_bytes, char cl
 
 	generate_key(&state->rng, state->private_key, state->public_key);
 
-	cymric_generate(&state->rng, state->nonce, 32);
+	cymric_random(&state->rng, state->nonce, 32);
 
 	memcpy(client_request, state->public_key, 64);
 	memcpy(client_request + 64, state->nonce, 32);
@@ -183,7 +187,7 @@ int tabby_sign(tabby_server *S, const void *message, int bytes, char signature[9
 
 	// r = BLAKE2(sign_key, M) mod q
 	char r[64];
-	if (blake2b(r, message, state->sign_key, 64, bytes, 32)) {
+	if (blake2b((u8*)r, message, state->sign_key, 64, bytes, 32)) {
 		return -1;
 	}
 	snowshoe_mod_q(r, r);
@@ -200,8 +204,8 @@ int tabby_sign(tabby_server *S, const void *message, int bytes, char signature[9
 	blake2b_init(&B, 64);
 	blake2b_update(&B, (const u8 *)state->public_key, 64);
 	blake2b_update(&B, (const u8 *)R, 64);
-	blake2b_update(&B, message, bytes);
-	blake2b_final(&B, t, 64);
+	blake2b_update(&B, (const u8 *)message, bytes);
+	blake2b_final(&B, (u8 *)t, 64);
 	snowshoe_mod_q(t, t);
 
 	// s = r + t*SS (mod q)
@@ -227,8 +231,8 @@ int tabby_verify(const void *message, int bytes, const char public_key[64], char
 	blake2b_init(&B, 64);
 	blake2b_update(&B, (const u8 *)public_key, 64);
 	blake2b_update(&B, (const u8 *)R, 64);
-	blake2b_update(&B, message, bytes);
-	blake2b_final(&B, t, 64);
+	blake2b_update(&B, (const u8 *)message, bytes);
+	blake2b_final(&B, (u8 *)t, 64);
 	snowshoe_mod_q(t, t);
 
 	// u = sG - tSP
@@ -259,14 +263,17 @@ int tabby_server_rekey(tabby_server *S, const void *seed, int seed_bytes) {
 	}
 
 	// If a new key is requested,
-	if (state->flag1 == FLAG_NEED_REKEY) {
+	if (state->flag_rekey == FLAG_NEED_REKEY) {
 		CAT_FENCE_COMPILER;
 
 		// Copy RNG state
-		state->rng_rekey = state->rng;
+		memcpy(&state->rng_rekey, &state->rng, sizeof(state->rng_rekey));
 
-		// Seed RNG
-		generate_key(&state->rng_rekey, seed, seed_bytes, state->private_rekey, state->public_rekey);
+		// Seed new RNG
+		cymric_seed(&state->rng_rekey, seed, seed_bytes);
+
+		// Generate ephemeral key pair
+		generate_key(&state->rng_rekey, state->private_rekey, state->public_rekey);
 
 		CAT_FENCE_COMPILER;
 
@@ -277,7 +284,7 @@ int tabby_server_rekey(tabby_server *S, const void *seed, int seed_bytes) {
 	return 0;
 }
 
-int tabby_server_handshake(tabby_server *S, const const client_request[96], char server_response[128], char secret_key[32]) {
+int tabby_server_handshake(tabby_server *S, const char client_request[96], char server_response[128], char secret_key[32]) {
 	server_internal *state = (server_internal *)S;
 
 	if (!m_initialized) {
@@ -297,11 +304,11 @@ int tabby_server_handshake(tabby_server *S, const const client_request[96], char
 		CAT_FENCE_COMPILER;
 
 		// Copy over the generated ephemeral key pair
-		memcpy(state->private_ephemeral, private_rekey, 32);
-		memcpy(state->public_ephemeral, public_rekey, 64);
+		memcpy(state->private_ephemeral, state->private_rekey, 32);
+		memcpy(state->public_ephemeral, state->public_rekey, 64);
 
 		// Copy over the new RNG state
-		state->rng = state->rng_rekey;
+		memcpy(&state->rng, &state->rng_rekey, sizeof(state->rng));
 
 		CAT_FENCE_COMPILER;
 
@@ -311,15 +318,15 @@ int tabby_server_handshake(tabby_server *S, const const client_request[96], char
 
 	char T[64+64];
 	char *H = T + 64;
+	char h[32];
 	char e[32];
-	char *SN = server_response + 64;
+	char *nonce = server_response + 64;
+	char z;
 
 	do {
-		char z;
-
 		do {
 			// Generate server nonce SN
-			cymric_generate(rng, SN, 32);
+			cymric_random(&state->rng, nonce, 32);
 
 			// H = BLAKE2(CP, CN, EP, SP, SN)
 			blake2b_state B;
@@ -328,11 +335,10 @@ int tabby_server_handshake(tabby_server *S, const const client_request[96], char
 			blake2b_update(&B, (const u8 *)client_request + 64, 32);
 			blake2b_update(&B, (const u8 *)state->public_ephemeral, 64);
 			blake2b_update(&B, (const u8 *)state->public_key, 64);
-			blake2b_update(&B, (const u8 *)SN, 32);
-			blake2b_final(&B, H, 64);
+			blake2b_update(&B, (const u8 *)nonce, 32);
+			blake2b_final(&B, (u8 *)H, 64);
 
 			// h = H mod q
-			char h[32];
 			snowshoe_mod_q(H, h);
 
 			// If h == 0, choose a new SN and start over.
@@ -350,7 +356,7 @@ int tabby_server_handshake(tabby_server *S, const const client_request[96], char
 
 	// k = BLAKE2(T, H)
 	char k[64];
-	if (blake2b(k, T, 0, 64, 128, 0)) {
+	if (blake2b((u8 *)k, T, 0, 64, 128, 0)) {
 		return -1;
 	}
 
@@ -362,6 +368,11 @@ int tabby_server_handshake(tabby_server *S, const const client_request[96], char
 
 	// PROOF = high 32 bytes of k
 	memcpy(server_response + 32 + 64, k + 32, 32);
+
+	CAT_SECURE_CLR(T, sizeof(T));
+	CAT_SECURE_CLR(h, sizeof(h));
+	CAT_SECURE_CLR(e, sizeof(e));
+	CAT_SECURE_CLR(&z, sizeof(z));
 
 	return 0;
 }
@@ -383,8 +394,11 @@ int tabby_client_handshake(tabby_client *C, const char server_public_key[64], co
 
 	char T[64+64];
 	char *H = T + 64;
-	char *EP = server_response;
-	char *SN = server_response = server_response + 64;
+	char h[32];
+	char k[64];
+	char *d = k;
+	const char *EP = server_response;
+	const char *SN = server_response = server_response + 64;
 
 	// H = BLAKE2(CP, CN, EP, SP, SN)
 	blake2b_state B;
@@ -394,14 +408,13 @@ int tabby_client_handshake(tabby_client *C, const char server_public_key[64], co
 	blake2b_update(&B, (const u8 *)EP, 64);
 	blake2b_update(&B, (const u8 *)server_public_key, 64);
 	blake2b_update(&B, (const u8 *)SN, 32);
-	blake2b_final(&B, H, 64);
+	blake2b_final(&B, (u8 *)H, 64);
 
 	// h = H mod q
-	char h[32];
 	snowshoe_mod_q(H, h);
 
 	// If h == 0, choose a new SN and start over.
-	z = 0;
+	char z = 0;
 	for (int ii = 0; ii < 32; ++ii) {
 		z |= h[ii];
 	}
@@ -410,7 +423,6 @@ int tabby_client_handshake(tabby_client *C, const char server_public_key[64], co
 	}
 
 	// d = h * CS (mod q)
-	char d[32];
 	snowshoe_mul_mod_q(h, state->private_key, 0, d);
 
 	// T = CS * EP + d * SP
@@ -419,8 +431,7 @@ int tabby_client_handshake(tabby_client *C, const char server_public_key[64], co
 	}
 
 	// k = BLAKE2(T, H)
-	char k[64];
-	if (blake2b(k, T, 0, 64, 128, 0)) {
+	if (blake2b((u8 *)k, T, 0, 64, 128, 0)) {
 		return -1;
 	}
 
@@ -436,7 +447,18 @@ int tabby_client_handshake(tabby_client *C, const char server_public_key[64], co
 	// Session key is the low 32 bytes of k
 	memcpy(secret_key, k, 32);
 
+	CAT_SECURE_CLR(T, sizeof(T));
+	CAT_SECURE_CLR(h, sizeof(h));
+	CAT_SECURE_CLR(k, sizeof(k));
+	CAT_SECURE_CLR(&z, sizeof(z));
+
 	return 0;
+}
+
+void tabby_erase(void *object, int bytes) {
+	if (object && bytes > 0) {
+		CAT_SECURE_CLR(object, bytes);
+	}
 }
 
 #ifdef __cplusplus

@@ -11,7 +11,7 @@ DBGFLAGS = -g -O0 -DDEBUG
 CFLAGS = -Wall -fstrict-aliasing -I./blake2/sse -I./libcat -I./include \
 		 -I./snowshoe/include -I./cymric/include
 LIBNAME = libtabby.a
-LIBS = snowshoe cymric
+LIBS = -lsnowshoe -lcymric
 
 
 # Object files
@@ -56,7 +56,7 @@ library : $(tabby_o)
 
 test : CFLAGS += -DUNIT_TEST $(OPTFLAGS)
 test : clean $(tabby_test_o) library
-	$(CCPP) $(tabby_test_o) $(LIBS) -L. -ltabby -o test
+	$(CCPP) $(tabby_test_o) $(LIBS) -L. -ltabby -L./snowshoe/bin -L./cymric/bin -o test
 	./test
 
 
