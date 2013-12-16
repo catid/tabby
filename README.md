@@ -10,6 +10,8 @@ cannot be decrypted if the server's long-term secret key is leaked somehow.
 It is a one-round protocol that runs faster than signcryption-based approaches,
 while exposing less sensitive information.  Tabby has a "128-bit" security level.
 
+Tabby also provides signatures based on the efficient EdDSA approach.
+
 Tabby uses the [Snowshoe](https://github.com/catid/snowshoe/) elliptic curve
 math library, and it also uses the [Cymric](https://github.com/catid/cymric/)
 secure random number generator library.  Please refer to those repositories for
