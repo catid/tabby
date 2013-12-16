@@ -3,8 +3,10 @@
 
 The Tabby key agreement protocol is designed for the situation where a client
 is attempting to connect to a server it has not connected to before.  After the
-protocol completes, a secret key has been derived by both parties.  The server
-has also been authenticated by the client.  Weak "forward secrecy" is provided.
+protocol completes, a 256-bit secret key is shared by both parties.  The server
+has also been authenticated by the client.  Weak "forward secrecy" is provided,
+in that after the server changes its ephemeral key, all previous connections
+cannot be decrypted if the server's long-term secret key is leaked somehow.
 It is a one-round protocol that runs faster than signcryption-based approaches,
 while exposing less sensitive information.  Tabby has a "128-bit" security level.
 
