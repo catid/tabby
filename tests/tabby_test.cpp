@@ -20,13 +20,16 @@ int main() {
 
 	// Initialize server offline:
 
-	tabby_server s;
+	cout << "Generating a 256-bit entropy server key..." << endl;
 
+	tabby_server s;
 	char public_key[64];
 
 	tabby_server_gen(&s, 0, 0);
 
 	assert(0 == tabby_get_public_key(&s, public_key));
+
+	cout << "+ Successfully created a new server key." << endl;
 
 	// Signature test:
 
@@ -41,6 +44,8 @@ int main() {
 	const char *message1 = "Mz message";
 
 	assert(0 != tabby_verify(message1, message_bytes, public_key, signature));
+
+	cout << "+ Signature validation test successful!" << endl;
 
 	// Handshake test:
 

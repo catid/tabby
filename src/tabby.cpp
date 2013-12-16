@@ -26,6 +26,9 @@
 	POSSIBILITY OF SUCH DAMAGE.
 */
 
+#include <iostream>
+using namespace std;
+
 #include "tabby.h"
 #include "snowshoe.h"
 #include "cymric.h"
@@ -111,6 +114,22 @@ void tabby_server_gen(tabby_server *S, const void *seed, int seed_bytes) {
 }
 
 void tabby_client_gen(tabby_client *C, const void *seed, int seed_bytes, char client_request[96]) {
+	client_internal *state = (client_internal *)C;
+
+	cymric_seed(&state->rng, seed, seed_bytes);
+
+	generate_key(&state->rng, state->private_key, state->public_key);
+
+	cymric_random(&state->rng, state->nonce, 32);
+
+	memcpy(client_request, state->public_key, 64);
+	memcpy(client_request + 64, state->nonce, 32);
+
+	state->flag = FLAG_INIT;
+}
+
+int tabby_client_derive(const tabby_client *existing, tabby_client *C, char client_request[96]) {
+	const client_internal *old_state = (const client_internal *)existing;
 	client_internal *state = (client_internal *)C;
 
 	cymric_seed(&state->rng, seed, seed_bytes);
@@ -321,6 +340,8 @@ int tabby_server_handshake(tabby_server *S, const char client_request[96], char 
 	char h[32];
 	char e[32];
 	char *nonce = server_response + 64;
+	const char *client_public = client_request;
+	const char *client_nonce = client_request + 64;
 	char z;
 
 	do {
@@ -331,8 +352,8 @@ int tabby_server_handshake(tabby_server *S, const char client_request[96], char 
 			// H = BLAKE2(CP, CN, EP, SP, SN)
 			blake2b_state B;
 			blake2b_init(&B, 64);
-			blake2b_update(&B, (const u8 *)client_request, 64);
-			blake2b_update(&B, (const u8 *)client_request + 64, 32);
+			blake2b_update(&B, (const u8 *)client_public, 64);
+			blake2b_update(&B, (const u8 *)client_nonce, 32);
 			blake2b_update(&B, (const u8 *)state->public_ephemeral, 64);
 			blake2b_update(&B, (const u8 *)state->public_key, 64);
 			blake2b_update(&B, (const u8 *)nonce, 32);
@@ -351,8 +372,17 @@ int tabby_server_handshake(tabby_server *S, const char client_request[96], char 
 		// e = h * SS + ES (mod q)
 		snowshoe_mul_mod_q(h, state->private_key, state->private_ephemeral, e);
 
-		// T = e * SP
-	} while (snowshoe_mul(e, state->public_key, T));
+		// If e == 0, choose a new SN and start over.
+		z = 0;
+		for (int ii = 0; ii < 32; ++ii) {
+			z |= h[ii];
+		}
+	} while (!z);
+
+	// T = e * SP
+	if (snowshoe_mul(e, client_public, T)) {
+		return -1;
+	}
 
 	// k = BLAKE2(T, H)
 	char k[64];
@@ -398,7 +428,8 @@ int tabby_client_handshake(tabby_client *C, const char server_public_key[64], co
 	char k[64];
 	char *d = k;
 	const char *EP = server_response;
-	const char *SN = server_response = server_response + 64;
+	const char *SN = server_response + 64;
+	const char *PROOF = server_response + 96;
 
 	// H = BLAKE2(CP, CN, EP, SP, SN)
 	blake2b_state B;
@@ -438,7 +469,7 @@ int tabby_client_handshake(tabby_client *C, const char server_public_key[64], co
 	// Verify the high 32 bytes of k matches PROOF
 	z = 0;
 	for (int ii = 0; ii < 32; ++ii) {
-		z |= server_response[64 + 32 + ii] ^ k[32 + ii];
+		z |= PROOF[ii] ^ k[32 + ii];
 	}
 	if (z) {
 		return -1;

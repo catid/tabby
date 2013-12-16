@@ -64,12 +64,39 @@ typedef struct {
 extern void tabby_server_gen(tabby_server *S, const void *seed, int seed_bytes);
 
 /*
+ * Rekey a Tabby server object
+ *
+ * This should be done no more often than once per minute, and optimally
+ * from a separate thread since it can take a minute to complete.
+ *
+ * You may optionally provide extra random number data as a seed to improve
+ * the quality of the generated keys; otherwise pass NULL for seed.
+ *
+ * Returns 0 on success.
+ * Returns non-zero if the input data is invalid.
+ */
+extern int tabby_server_rekey(tabby_server *S, const void *seed, int seed_bytes);
+
+/*
  * Generate a Tabby client object
  *
  * You may optionally provide extra random number data as a seed to improve
  * the quality of the generated keys; otherwise pass NULL for seed.
  */
 extern void tabby_client_gen(tabby_client *C, const void *seed, int seed_bytes, char client_request[96]);
+
+/*
+ * Derive a new Tabby client object from an old one
+ *
+ * This reuses data from the old Tabby client object to speed up initialization.
+ *
+ * This function is also useful for resetting a Tabby client object to connect
+ * again by setting existing == C.
+ *
+ * Returns 0 on success.
+ * Returns non-zero if the input data is invalid.
+ */
+extern int tabby_client_derive(const tabby_client *existing, tabby_client *C, char client_request[96]);
 
 /*
  * Returns the public key for a Tabby server object
@@ -113,20 +140,6 @@ extern int tabby_sign(tabby_server *S, const void *message, int bytes, char sign
  * Returns non-zero if the server data is invalid.
  */
 extern int tabby_verify(const void *message, int bytes, const char public_key[64], char signature[96]);
-
-/*
- * Rekey a Tabby server object
- *
- * This should be done no more often than once per minute, and optimally
- * from a separate thread since it can take a minute to complete.
- *
- * You may optionally provide extra random number data as a seed to improve
- * the quality of the generated keys; otherwise pass NULL for seed.
- *
- * Returns 0 on success.
- * Returns non-zero if the input data is invalid.
- */
-extern int tabby_server_rekey(tabby_server *S, const void *seed, int seed_bytes);
 
 /*
  * Process client request
