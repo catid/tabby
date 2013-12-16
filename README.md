@@ -14,6 +14,34 @@ secure random number generator library.  Please refer to those repositories for
 more information about the underlying math and software implementation.
 
 
+#### Benchmarks
+
+The following measurements show normal walltime with Turbo Boost on, and median
+cycles with Turbo Boost off.  The measurements were taken over 10,000 samples
+for each configuration, unless otherwise noted.
+
+##### libtabby.a on Macbook Air (1.7 GHz Core i5-2557M Sandy Bridge, July 2011):
+
+Key generation:
+
++ Successfully created a new server key in `185688` cycles, `88` usec (one sample)
++ Generated a client key in `65444` cycles, `36` usec (one sample)
++ Periodic server rekey in `64300` cycles, `25` usec (one sample)
+
+Signatures:
+
++ Tabby sign: `68672` median cycles, `25.9993` avg usec
++ Tabby verify signature: `163324` median cycles, `61.7676` avg usec
+
+One-round EC-DH with forward secrecy:
+
++ Tabby server handshake: `143180` median cycles, `54.1224` avg usec
++ Tabby client handshake: `205944` median cycles, 77.7556` avg usec
+
+Each of these operations takes roughly 2-3 usec longer than the Snowshoe math
+routines they are based on.
+
+
 #### Tabby Key Generation Process : Algorithm 1
 
 To produce private/public key pairs for Tabby, the following process is performed:
@@ -55,7 +83,7 @@ Server online processing:
 + Server uses Cymric to generate a 256-bit number-used-only-once (nonce) SN.
 + H = BLAKE2(CP, CN, EP, SP, SN) : 64 bytes.
 + h = H (mod q) with Snowshoe; q is a Snowshoe parameter.
-+ If h == 0, choose a new SN and start over.
++ Verify in constant-time that h != 0.  If so, start over.
 + e = SS * h + ES (mod q) with Snowshoe.
 + Verify in constant-time that e != 0.  If so, start over.
 + T(X,Y) = e * SP with Snowshoe.
@@ -140,64 +168,9 @@ On the other hand, handshakes with Tabby are tied to the long-term private key
 of the server in addition to the ephemeral key, so this type of impersonation
 attack is impossible.
 
-#### Protocol Security
+#### TODO
 
-This section revisits the protocol with more detail.
-
-Server offline processing:
-
-+ Server generates a 256-bit random number (S0) with Cymric.  Cymric 
-
-+ Server uses S0 to generate a private key (SS) and public key (SP) pair with Snowshoe.
-+ Server publishes its public key SP somehow so that the clients will know it ahead of time.
-
-Server online processing; every 30 minutes:
-
-+ Server generates a 256-bit random number (E0) with Cymric.
-+ Server uses E0 to generate a private key (ES) and public key (EP) pair with Snowshoe.
-
-Client online processing:
-
-+ Client generates two 256-bit random numbers (C0, C1) with Cymric.
-+ Client uses C0 to generate a private key (CS) and public key (CP) pair with Snowshoe.
-+ Client uses C1 as the client nonce (CN).
-
-Client sends to server:
-
-+ Client public key (CP).
-+ Client nonce (CN).
-
-Server online processing:
-
-+ Server generates a 256-bit random number (SN) with Cymric.
-+ H = BLAKE2(CP, CN, EP, SP, SN) : 64 bytes.
-+ h = H (mod q) with Snowshoe; q is a Snowshoe parameter.
-+ e = SS * h + ES (mod q) with Snowshoe.
-+ If e < 65536, choose a new SN and start over.
-+ T(X,Y) = e * SP with Snowshoe.
-+ k = BLAKE2(h, T) : 64 bytes.
-+ Session key is the low 32 bytes of k.
-+ The high 32 bytes of k is the server proof of key knowledge (PROOF).
-
-Server sends to client:
-
-+ Server ephemeral public key (EP).
-+ Server nonce (SN).
-+ Server proof (PROOF).
-
-Client online processing:
-
-+ H = BLAKE2(CP, CN, EP, SP, SN) : 64 bytes.
-+ h = H (mod q) with Snowshoe; q is a Snowshoe parameter.
-+ d = h * CS (mod q) with Snowshoe.
-+ Verify d >= 65536.
-+ T'(X,Y) = CS * SP + d * EP with Snowshoe.
-+ k' = BLAKE2(h, T') : 64 bytes.
-+ Session key is the low 32 bytes of k'.
-+ Verify the high 32 bytes of k' matches PROOF.
-
-Both parties now have a public key.
-The server has been authenticated by the client.
-
-#### References
++ References
++ Read through code again and look for bugs
++ Analyze the protocol to make sure it is solid
 
