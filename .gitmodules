@@ -7,3 +7,6 @@
 [submodule "snowshoe"]
 	path = snowshoe
 	url = https://github.com/catid/snowshoe.git
+[submodule "blake2"]
+	path = blake2
+	url = https://github.com/BLAKE2/BLAKE2.git
