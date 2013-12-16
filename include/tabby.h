@@ -61,7 +61,7 @@ typedef struct {
  * You may optionally provide extra random number data as a seed to improve
  * the quality of the generated keys; otherwise pass NULL for seed.
  */
-extern void tabby_server_gen(tabby_server *S, const void *seed, int seed_bytes);
+extern int tabby_server_gen(tabby_server *S, const void *seed, int seed_bytes);
 
 /*
  * Rekey a Tabby server object
@@ -83,7 +83,7 @@ extern int tabby_server_rekey(tabby_server *S, const void *seed, int seed_bytes)
  * You may optionally provide extra random number data as a seed to improve
  * the quality of the generated keys; otherwise pass NULL for seed.
  */
-extern void tabby_client_gen(tabby_client *C, const void *seed, int seed_bytes, char client_request[96]);
+extern int tabby_client_gen(tabby_client *C, const void *seed, int seed_bytes, char client_request[96]);
 
 /*
  * Derive a new Tabby client object from an old one
@@ -93,10 +93,13 @@ extern void tabby_client_gen(tabby_client *C, const void *seed, int seed_bytes, 
  * This function is also useful for resetting a Tabby client object to connect
  * again by setting existing == C.
  *
+ * You may optionally provide extra random number data as a seed to improve
+ * the quality of the generated keys; otherwise pass NULL for seed.
+ *
  * Returns 0 on success.
  * Returns non-zero if the input data is invalid.
  */
-extern int tabby_client_derive(const tabby_client *existing, tabby_client *C, char client_request[96]);
+extern int tabby_client_rekey(const tabby_client *existing, tabby_client *C, const void *seed, int seed_bytes, char client_request[96]);
 
 /*
  * Returns the public key for a Tabby server object

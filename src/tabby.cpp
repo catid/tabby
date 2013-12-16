@@ -99,8 +99,12 @@ int _tabby_init(int expected_version) {
 	return 0;
 }
 
-void tabby_server_gen(tabby_server *S, const void *seed, int seed_bytes) {
+int tabby_server_gen(tabby_server *S, const void *seed, int seed_bytes) {
 	server_internal *state = (server_internal *)S;
+
+	if (!S) {
+		return -1;
+	}
 
 	cymric_seed(&state->rng, seed, seed_bytes);
 
@@ -111,10 +115,16 @@ void tabby_server_gen(tabby_server *S, const void *seed, int seed_bytes) {
 
 	state->flag = FLAG_INIT;
 	state->flag_rekey = FLAG_NEED_REKEY;
+
+	return 0;
 }
 
-void tabby_client_gen(tabby_client *C, const void *seed, int seed_bytes, char client_request[96]) {
+int tabby_client_gen(tabby_client *C, const void *seed, int seed_bytes, char client_request[96]) {
 	client_internal *state = (client_internal *)C;
+
+	if (!C || !client_request) {
+		return -1;
+	}
 
 	cymric_seed(&state->rng, seed, seed_bytes);
 
@@ -126,15 +136,22 @@ void tabby_client_gen(tabby_client *C, const void *seed, int seed_bytes, char cl
 	memcpy(client_request + 64, state->nonce, 32);
 
 	state->flag = FLAG_INIT;
+
+	return 0;
 }
 
-int tabby_client_derive(const tabby_client *existing, tabby_client *C, char client_request[96]) {
-	const client_internal *old_state = (const client_internal *)existing;
+int tabby_client_rekey(const tabby_client *existing, tabby_client *C, const void *seed, int seed_bytes, char client_request[96]) {
+	client_internal *old_state = (client_internal *)existing;
 	client_internal *state = (client_internal *)C;
 
-	cymric_seed(&state->rng, seed, seed_bytes);
+	if (!existing || !C || !client_request || state->flag != FLAG_INIT) {
+		return -1;
+	}
 
-	generate_key(&state->rng, state->private_key, state->public_key);
+	cymric_derive(&state->rng, &old_state->rng, seed, seed_bytes);
+
+	memcpy(state->private_key, old_state->private_key, 32);
+	memcpy(state->public_key, old_state->public_key, 64);
 
 	cymric_random(&state->rng, state->nonce, 32);
 
@@ -142,12 +159,14 @@ int tabby_client_derive(const tabby_client *existing, tabby_client *C, char clie
 	memcpy(client_request + 64, state->nonce, 32);
 
 	state->flag = FLAG_INIT;
+
+	return 0;
 }
 
 int tabby_get_public_key(tabby_server *S, char public_key[64]) {
 	server_internal *state = (server_internal *)S;
 
-	if (state->flag != FLAG_INIT) {
+	if (!S || !public_key || state->flag != FLAG_INIT) {
 		return -1;
 	}
 
@@ -159,7 +178,7 @@ int tabby_get_public_key(tabby_server *S, char public_key[64]) {
 int tabby_server_save(tabby_server *S, char server_data[64]) {
 	server_internal *state = (server_internal *)S;
 
-	if (state->flag != FLAG_INIT) {
+	if (!S || !server_data || state->flag != FLAG_INIT) {
 		return -1;
 	}
 
@@ -171,6 +190,10 @@ int tabby_server_save(tabby_server *S, char server_data[64]) {
 
 int tabby_server_load(tabby_server *S, const void *seed, int seed_bytes, const char server_data[64]) {
 	server_internal *state = (server_internal *)S;
+
+	if (!S || !server_data) {
+		return -1;
+	}
 
 	memcpy(state->private_key, server_data, 32);
 	memcpy(state->sign_key, server_data + 32, 32);

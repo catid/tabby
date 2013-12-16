@@ -25,7 +25,7 @@ int main() {
 	tabby_server s;
 	char public_key[64];
 
-	tabby_server_gen(&s, 0, 0);
+	assert(0 == tabby_server_gen(&s, 0, 0));
 
 	assert(0 == tabby_get_public_key(&s, public_key));
 
@@ -50,11 +50,12 @@ int main() {
 	// Handshake test:
 
 	tabby_client c;
+	char client_request[96];
+
+	assert(0 == tabby_client_gen(&c, 0, 0, client_request));
 
 	for (int ii = 0; ii < 10000; ++ii) {
-		char client_request[96];
-
-		tabby_client_gen(&c, 0, 0, client_request);
+		assert(0 == tabby_client_rekey(&c, &c, 0, 0, client_request));
 
 		char server_response[128];
 		char server_secret_key[32];
