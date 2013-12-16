@@ -479,6 +479,15 @@ int tabby_client_handshake(tabby_client *C, const char server_public_key[64], co
 	// d = h * CS (mod q)
 	snowshoe_mul_mod_q(h, state->private_key, 0, d);
 
+	// Validate that d != 0
+	char z = 0;
+	for (int ii = 0; ii < 32; ++ii) {
+		z |= d[ii];
+	}
+	if (!z) {
+		return -1;
+	}
+
 	// T = CS * EP + d * SP
 	if (snowshoe_simul(state->private_key, EP, d, server_public_key, T)) {
 		return -1;
