@@ -1,5 +1,5 @@
 # Tabby
-### Key Agreement and Signatures
+#### Strong, Fast, and Portable Cryptographic Signatures and Handshakes
 
 The Tabby key agreement protocol is designed for the situation where a client
 is attempting to connect to a server it has not connected to before.  After the
