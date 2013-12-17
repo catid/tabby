@@ -57,6 +57,7 @@ To produce private/public key pairs for Tabby, the following process is performe
 + Step 3: Calculate S = R mod q using Snowshoe : 32 bytes.
 + Step 4: Check if S == 0 in constant-time; if so start over at step 2.
 + Step 5: Calculate P = S * G using Snowshoe : 64 bytes.
++ Step 6: Erase R from memory.
 
 The secret key is S (32 bytes), and the public key is P (64 bytes).
 
