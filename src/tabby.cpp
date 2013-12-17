@@ -26,15 +26,13 @@
 	POSSIBILITY OF SUCH DAMAGE.
 */
 
-#include <iostream>
-using namespace std;
-
 #include "tabby.h"
 #include "snowshoe.h"
 #include "cymric.h"
 #include "blake2.h"
 
 #include "Platform.hpp"
+#include "SecureErase.hpp"
 using namespace cat;
 
 static bool m_initialized = false;
@@ -97,7 +95,7 @@ static int generate_key(cymric_rng *rng, char private_key[32], char public_key[6
 
 	// Note that snowshoe will validate the private key for us
 
-	CAT_SECURE_CLR(key, sizeof(key));
+	CAT_SECURE_OBJCLR(key);
 
 	return 0;
 }
@@ -309,8 +307,8 @@ int tabby_sign(tabby_server *S, const void *message, int bytes, char signature[9
 	char *s = signature + 64;
 	snowshoe_mul_mod_q(t, state->private_key, r, s);
 
-	CAT_SECURE_CLR(r, sizeof(r));
-	CAT_SECURE_CLR(t, sizeof(t));
+	CAT_SECURE_OBJCLR(r);
+	CAT_SECURE_OBJCLR(t);
 
 	return 0;
 }
@@ -479,9 +477,9 @@ int tabby_server_handshake(tabby_server *S, const char client_request[96], char 
 	// PROOF = high 32 bytes of k
 	memcpy(server_response + 32 + 64, k + 32, 32);
 
-	CAT_SECURE_CLR(T, sizeof(T));
-	CAT_SECURE_CLR(h, sizeof(h));
-	CAT_SECURE_CLR(e, sizeof(e));
+	CAT_SECURE_OBJCLR(T);
+	CAT_SECURE_OBJCLR(h);
+	CAT_SECURE_OBJCLR(e);
 
 	return 0;
 }
@@ -554,16 +552,16 @@ int tabby_client_handshake(tabby_client *C, const char server_public_key[64], co
 	// Session key is the low 32 bytes of k
 	memcpy(secret_key, k, 32);
 
-	CAT_SECURE_CLR(T, sizeof(T));
-	CAT_SECURE_CLR(h, sizeof(h));
-	CAT_SECURE_CLR(k, sizeof(k));
+	CAT_SECURE_OBJCLR(T);
+	CAT_SECURE_OBJCLR(h);
+	CAT_SECURE_OBJCLR(k);
 
 	return 0;
 }
 
 void tabby_erase(void *object, int bytes) {
 	if (object && bytes > 0) {
-		CAT_SECURE_CLR(object, bytes);
+		cat_secure_erase(object, bytes);
 	}
 }
 

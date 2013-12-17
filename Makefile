@@ -10,7 +10,7 @@ OPTFLAGS = -O3
 DBGFLAGS = -g -O0 -DDEBUG
 CFLAGS = -Wall -fstrict-aliasing -I./blake2/sse -I./libcat -I./include \
 		 -I./snowshoe/include -I./cymric/include
-LIBNAME = libtabby.a
+LIBNAME = bin/libtabby.a
 LIBS = -lsnowshoe -lcymric
 
 
@@ -18,7 +18,7 @@ LIBS = -lsnowshoe -lcymric
 
 shared_test_o = Clock.o
 
-tabby_o = tabby.o blake2b.o
+tabby_o = tabby.o blake2b.o SecureErase.o
 
 tabby_test_o = tabby_test.o $(shared_test_o)
 
@@ -56,7 +56,7 @@ library : $(tabby_o)
 
 test : CFLAGS += -DUNIT_TEST $(OPTFLAGS)
 test : clean $(tabby_test_o) library
-	$(CCPP) $(tabby_test_o) $(LIBS) -L. -ltabby -L./snowshoe/bin -L./cymric/bin -o test
+	$(CCPP) $(tabby_test_o) $(LIBS) -L./bin -ltabby -L./snowshoe/bin -L./cymric/bin -o test
 	./test
 
 
@@ -64,6 +64,9 @@ test : clean $(tabby_test_o) library
 
 Clock.o : libcat/Clock.cpp
 	$(CCPP) $(CFLAGS) -c libcat/Clock.cpp
+
+SecureErase.o : libcat/SecureErase.cpp
+	$(CCPP) $(CFLAGS) -c libcat/SecureErase.cpp
 
 
 # Library objects
@@ -86,6 +89,6 @@ tabby_test.o : tests/tabby_test.cpp
 .PHONY : clean
 
 clean :
-	git submodule update --init
+	#git submodule update --init
 	-rm test libtabby.a $(shared_test_o) $(tabby_test_o) $(tabby_o)
 
