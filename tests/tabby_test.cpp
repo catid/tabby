@@ -262,6 +262,10 @@ int main() {
 
 	cout << "Tests succeeded!" << endl;
 
+	// Erase sensitive data from memory
+	tabby_erase(&s, sizeof(s));
+	tabby_erase(&c, sizeof(c));
+
 	m_clock.OnFinalize();
 
 	return 0;

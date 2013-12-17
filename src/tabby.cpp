@@ -67,11 +67,13 @@ static const u32 FLAG_INIT = 0x11223344;
 static const u32 FLAG_NEED_REKEY = 1;
 static const u32 FLAG_REKEY_DONE = 2;
 
-static void generate_key(cymric_rng *rng, char private_key[32], char public_key[64]) {
+static int generate_key(cymric_rng *rng, char private_key[32], char public_key[64]) {
 	char key[64];
 
 	do {
-		cymric_random(rng, key, 64);
+		if (cymric_random(rng, key, 64)) {
+			return -1;
+		}
 
 		snowshoe_mod_q(key, private_key);
 	} while (snowshoe_mul_gen(private_key, public_key));
@@ -79,6 +81,8 @@ static void generate_key(cymric_rng *rng, char private_key[32], char public_key[
 	// Note that snowshoe will validate the private key for us
 
 	CAT_SECURE_CLR(key, sizeof(key));
+
+	return 0;
 }
 
 #ifdef __cplusplus
@@ -98,6 +102,14 @@ int _tabby_init(int expected_version) {
 		return -1;
 	}
 
+	if (cymric_init()) {
+		return -1;
+	}
+
+	if (snowshoe_init()) {
+		return -1;
+	}
+
 	m_initialized = true;
 	return 0;
 }
@@ -109,10 +121,17 @@ int tabby_server_gen(tabby_server *S, const void *seed, int seed_bytes) {
 		return -1;
 	}
 
-	cymric_seed(&state->rng, seed, seed_bytes);
+	if (cymric_seed(&state->rng, seed, seed_bytes)) {
+		return -1;
+	}
 
-	generate_key(&state->rng, state->private_key, state->public_key);
-	generate_key(&state->rng, state->private_ephemeral, state->public_ephemeral);
+	if (generate_key(&state->rng, state->private_key, state->public_key)) {
+		return -1;
+	}
+
+	if (generate_key(&state->rng, state->private_ephemeral, state->public_ephemeral)) {
+		return -1;
+	}
 
 	cymric_random(&state->rng, state->sign_key, 32);
 
