@@ -67,6 +67,23 @@ static const u32 FLAG_INIT = 0x11223344;
 static const u32 FLAG_NEED_REKEY = 1;
 static const u32 FLAG_REKEY_DONE = 2;
 
+// Check if x == 0 in constant-time
+static bool is_zero(const char x[32]) {
+	const u64 *k = (const u64 *)x;
+	u64 zero = k[0] | k[1] | k[2] | k[3];
+	u32 z = (u32)(zero | (zero >> 32));
+	return z == 0;
+}
+
+// Check if x == y in constant-time
+static bool is_equal(const char x[32], const char y[32]) {
+	const u64 *k = (const u64 *)x;
+	const u64 *l = (const u64 *)y;
+	u64 zero = (k[0] ^ l[0]) | (k[1] ^ l[1]) | (k[2] ^ l[2]) | (k[3] ^ l[2]);
+	u32 z = (u32)(zero | (zero >> 32));
+	return z == 0;
+}
+
 static int generate_key(cymric_rng *rng, char private_key[32], char public_key[64]) {
 	char key[64];
 
@@ -133,7 +150,9 @@ int tabby_server_gen(tabby_server *S, const void *seed, int seed_bytes) {
 		return -1;
 	}
 
-	cymric_random(&state->rng, state->sign_key, 32);
+	if (cymric_random(&state->rng, state->sign_key, 32)) {
+		return -1;
+	}
 
 	state->flag = FLAG_INIT;
 	state->flag_rekey = FLAG_NEED_REKEY;
@@ -148,11 +167,17 @@ int tabby_client_gen(tabby_client *C, const void *seed, int seed_bytes, char cli
 		return -1;
 	}
 
-	cymric_seed(&state->rng, seed, seed_bytes);
+	if (cymric_seed(&state->rng, seed, seed_bytes)) {
+		return -1;
+	}
 
-	generate_key(&state->rng, state->private_key, state->public_key);
+	if (generate_key(&state->rng, state->private_key, state->public_key)) {
+		return -1;
+	}
 
-	cymric_random(&state->rng, state->nonce, 32);
+	if (cymric_random(&state->rng, state->nonce, 32)) {
+		return -1;
+	}
 
 	memcpy(client_request, state->public_key, 64);
 	memcpy(client_request + 64, state->nonce, 32);
@@ -170,12 +195,16 @@ int tabby_client_rekey(const tabby_client *existing, tabby_client *C, const void
 		return -1;
 	}
 
-	cymric_derive(&state->rng, &old_state->rng, seed, seed_bytes);
+	if (cymric_derive(&state->rng, &old_state->rng, seed, seed_bytes)) {
+		return -1;
+	}
 
 	memcpy(state->private_key, old_state->private_key, 32);
 	memcpy(state->public_key, old_state->public_key, 64);
 
-	cymric_random(&state->rng, state->nonce, 32);
+	if (cymric_random(&state->rng, state->nonce, 32)) {
+		return -1;
+	}
 
 	memcpy(client_request, state->public_key, 64);
 	memcpy(client_request + 64, state->nonce, 32);
@@ -224,9 +253,13 @@ int tabby_server_load(tabby_server *S, const void *seed, int seed_bytes, const c
 		return -1;
 	}
 
-	cymric_seed(&state->rng, seed, seed_bytes);
+	if (cymric_seed(&state->rng, seed, seed_bytes)) {
+		return -1;
+	}
 
-	generate_key(&state->rng, state->private_ephemeral, state->public_ephemeral);
+	if (generate_key(&state->rng, state->private_ephemeral, state->public_ephemeral)) {
+		return -1;
+	}
 
 	state->flag = FLAG_INIT;
 	state->flag_rekey = FLAG_NEED_REKEY;
@@ -339,10 +372,14 @@ int tabby_server_rekey(tabby_server *S, const void *seed, int seed_bytes) {
 		memcpy(&state->rng_rekey, &state->rng, sizeof(state->rng_rekey));
 
 		// Seed new RNG
-		cymric_seed(&state->rng_rekey, seed, seed_bytes);
+		if (cymric_seed(&state->rng_rekey, seed, seed_bytes)) {
+			return -1;
+		}
 
 		// Generate ephemeral key pair
-		generate_key(&state->rng_rekey, state->private_rekey, state->public_rekey);
+		if (generate_key(&state->rng_rekey, state->private_rekey, state->public_rekey)) {
+			return -1;
+		}
 
 		CAT_FENCE_COMPILER;
 
@@ -392,12 +429,13 @@ int tabby_server_handshake(tabby_server *S, const char client_request[96], char 
 	char *nonce = server_response + 64;
 	const char *client_public = client_request;
 	const char *client_nonce = client_request + 64;
-	char z;
 
 	do {
 		do {
 			// Generate server nonce SN
-			cymric_random(&state->rng, nonce, 32);
+			if (cymric_random(&state->rng, nonce, 32)) {
+				return -1;
+			}
 
 			// H = BLAKE2(CP, CN, EP, SP, SN)
 			blake2b_state B;
@@ -413,21 +451,13 @@ int tabby_server_handshake(tabby_server *S, const char client_request[96], char 
 			snowshoe_mod_q(H, h);
 
 			// If h == 0, choose a new SN and start over.
-			z = 0;
-			for (int ii = 0; ii < 32; ++ii) {
-				z |= h[ii];
-			}
-		} while (!z);
+		} while (is_zero(h));
 
 		// e = h * SS + ES (mod q)
 		snowshoe_mul_mod_q(h, state->private_key, state->private_ephemeral, e);
 
 		// If e == 0, choose a new SN and start over.
-		z = 0;
-		for (int ii = 0; ii < 32; ++ii) {
-			z |= h[ii];
-		}
-	} while (!z);
+	} while (is_zero(e));
 
 	// T = e * SP
 	if (snowshoe_mul(e, client_public, T)) {
@@ -452,7 +482,6 @@ int tabby_server_handshake(tabby_server *S, const char client_request[96], char 
 	CAT_SECURE_CLR(T, sizeof(T));
 	CAT_SECURE_CLR(h, sizeof(h));
 	CAT_SECURE_CLR(e, sizeof(e));
-	CAT_SECURE_CLR(&z, sizeof(z));
 
 	return 0;
 }
@@ -494,12 +523,8 @@ int tabby_client_handshake(tabby_client *C, const char server_public_key[64], co
 	// h = H mod q
 	snowshoe_mod_q(H, h);
 
-	// If h == 0, choose a new SN and start over.
-	char z = 0;
-	for (int ii = 0; ii < 32; ++ii) {
-		z |= h[ii];
-	}
-	if (!z) {
+	// Validate h != 0.
+	if (is_zero(h)) {
 		return -1;
 	}
 
@@ -507,11 +532,7 @@ int tabby_client_handshake(tabby_client *C, const char server_public_key[64], co
 	snowshoe_mul_mod_q(h, state->private_key, 0, d);
 
 	// Validate that d != 0
-	z = 0;
-	for (int ii = 0; ii < 32; ++ii) {
-		z |= d[ii];
-	}
-	if (!z) {
+	if (is_zero(d)) {
 		return -1;
 	}
 
@@ -526,11 +547,7 @@ int tabby_client_handshake(tabby_client *C, const char server_public_key[64], co
 	}
 
 	// Verify the high 32 bytes of k matches PROOF
-	z = 0;
-	for (int ii = 0; ii < 32; ++ii) {
-		z |= PROOF[ii] ^ k[32 + ii];
-	}
-	if (z) {
+	if (is_equal(PROOF, k + 32)) {
 		return -1;
 	}
 
@@ -540,7 +557,6 @@ int tabby_client_handshake(tabby_client *C, const char server_public_key[64], co
 	CAT_SECURE_CLR(T, sizeof(T));
 	CAT_SECURE_CLR(h, sizeof(h));
 	CAT_SECURE_CLR(k, sizeof(k));
-	CAT_SECURE_CLR(&z, sizeof(z));
 
 	return 0;
 }
