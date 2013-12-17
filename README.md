@@ -28,19 +28,19 @@ for each configuration, unless otherwise noted.
 
 Key generation:
 
-+ Successfully created a new server key in `378024` cycles, `178` usec (one sample)
-+ Generated a client key in `184684` cycles, `86` usec (one sample)
++ Successfully created a new server key in `378024` cycles, `165` usec (one sample)
++ Generated a client key in `184684` cycles, `76` usec (one sample)
 + Periodic server rekey in `189312` cycles, `75` usec (one sample)
 
 Signatures:
 
-+ Tabby sign: `68672` median cycles, `26.3009` avg usec
-+ Tabby verify signature: `163420` median cycles, `62.4262` avg usec
++ Tabby sign: `68672` median cycles, `25.7507` avg usec
++ Tabby verify signature: `163420` median cycles, `61.1933` avg usec
 
 One-round EC-DH with forward secrecy:
 
-+ Tabby server handshake: `144472` median cycles, `55.464` avg usec
-+ Tabby client handshake: `205504` median cycles, `78.8678` avg usec
++ Tabby server handshake: `144472` median cycles, `53.7942` avg usec
++ Tabby client handshake: `205504` median cycles, `77.3729` avg usec
 
 Each of these operations takes roughly 2-3 usec longer than the Snowshoe math
 routines they are based on.  Where applicable, these operations do full input
@@ -57,7 +57,6 @@ To produce private/public key pairs for Tabby, the following process is performe
 + Step 3: Calculate S = R mod q using Snowshoe : 32 bytes.
 + Step 4: Check if S == 0 in constant-time; if so start over at step 2.
 + Step 5: Calculate P = S * G using Snowshoe : 64 bytes.
-+ Step 6: Erase R from memory.
 
 The secret key is S (32 bytes), and the public key is P (64 bytes).
 

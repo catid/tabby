@@ -47,10 +47,12 @@ extern "C" {
 extern int _tabby_init(int expected_version);
 #define tabby_init() _tabby_init(TABBY_VERSION)
 
+// Opaque client state object
 typedef struct {
 	char internal[200];
 } tabby_client;
 
+// Opaque server state object
 typedef struct {
 	char internal[464];
 } tabby_server;
@@ -153,6 +155,16 @@ extern int tabby_verify(const void *message, int bytes, const char public_key[64
 /*
  * Process client request
  *
+ * This should be called to accept a new connection from a remote client.
+ * The server response is filled by this function and should be delivered
+ * to the remote client.
+ *
+ * It is the responsibility of the user to properly handle lost server
+ * responses, where the client times out waiting for a response from the
+ * server, and the server believes a session is established.  Ideally in
+ * this case, the next time the client sends an identical request, the
+ * server would send its response again without calling this function.
+ *
  * Returns 0 on success.
  * Returns non-zero if the input data is invalid.
  */
@@ -160,6 +172,11 @@ extern int tabby_server_handshake(tabby_server *S, const char client_request[96]
 
 /*
  * Process server response
+ *
+ * This is the first place where the server's public key is introduced
+ * on the client side.  The server's response is processed, and either
+ * a secret key is derived that will match the one on the server, or
+ * the function will error out on invalid data from the server.
  *
  * Returns 0 on success.
  * Returns non-zero if the input data is invalid.
@@ -170,7 +187,8 @@ extern int tabby_client_handshake(tabby_client *C, const char server_public_key[
  * Securely erase an object from memory
  *
  * When you are done with any of the Tabby objects, including secret keys,
- * be sure to erase them with this function.
+ * be sure to erase them with this function to avoid leaving it on the stack
+ * or heap where it could be scooped up later.
  */
 extern void tabby_erase(void *object, int bytes);
 
