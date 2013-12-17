@@ -180,26 +180,34 @@ extern "C" {
 #endif
 
 int _tabby_init(int expected_version) {
+	// If ABI compatibility is uncertain,
 	if (expected_version != TABBY_VERSION) {
 		return -1;
 	}
 
+	// If the internal version of the server structure is bigger
+	// than the one that the user sees,
 	if (sizeof(server_internal) > sizeof(tabby_server)) {
 		return -1;
 	}
 
+	// If the internal version of the client structure is bigger
+	// than the one that the user sees,
 	if (sizeof(client_internal) > sizeof(tabby_client)) {
 		return -1;
 	}
 
+	// If Cymric cannot initialize,
 	if (cymric_init()) {
 		return -1;
 	}
 
+	// If Snowshoe cannot initialize,
 	if (snowshoe_init()) {
 		return -1;
 	}
 
+	// Flag initialized true so we can do sanity checks later
 	m_initialized = true;
 	return 0;
 }
@@ -207,27 +215,36 @@ int _tabby_init(int expected_version) {
 int tabby_server_gen(tabby_server *S, const void *seed, int seed_bytes) {
 	server_internal *state = (server_internal *)S;
 
+	// Input validation
 	if (!S) {
 		return -1;
 	}
 
+	// Reseed the generator
 	if (cymric_seed(&state->rng, seed, seed_bytes)) {
 		return -1;
 	}
 
+	// Generate the long-term key pair
 	if (generate_key(&state->rng, state->private_key, state->public_key)) {
 		return -1;
 	}
 
-	if (generate_key(&state->rng, state->private_ephemeral, state->public_ephemeral)) {
-		return -1;
-	}
-
+	// Generate the long-term signing key
 	if (cymric_random(&state->rng, state->sign_key, 32)) {
 		return -1;
 	}
 
+	// Generate the ephemeral key pair afterwards to avoid any chance of leaking
+	// information about the long-term keys in ephemeral data
+	if (generate_key(&state->rng, state->private_ephemeral, state->public_ephemeral)) {
+		return -1;
+	}
+
+	// Flag as initialized for sanity checking later
 	state->flag = FLAG_INIT;
+
+	// Flag as needing a rekey
 	state->flag_rekey = FLAG_NEED_REKEY;
 
 	return 0;
@@ -236,25 +253,33 @@ int tabby_server_gen(tabby_server *S, const void *seed, int seed_bytes) {
 int tabby_client_gen(tabby_client *C, const void *seed, int seed_bytes, char client_request[96]) {
 	client_internal *state = (client_internal *)C;
 
+	// Input validation
 	if (!C || !client_request) {
 		return -1;
 	}
 
+	// Reseed the generator
 	if (cymric_seed(&state->rng, seed, seed_bytes)) {
 		return -1;
 	}
 
+	// Generate the client's ephemeral key pair
 	if (generate_key(&state->rng, state->private_key, state->public_key)) {
 		return -1;
 	}
 
+	// Generate a random nonce after the private key to avoid any chance of leaking
+	// information about the private key in public information
 	if (cymric_random(&state->rng, state->nonce, 32)) {
 		return -1;
 	}
 
+	// Construct the request object, which is:
+	// (client public key[64]) (client nonce[32])
 	memcpy(client_request, state->public_key, 64);
 	memcpy(client_request + 64, state->nonce, 32);
 
+	// Flag the object as initialized for sanity checking later
 	state->flag = FLAG_INIT;
 
 	return 0;
@@ -264,24 +289,37 @@ int tabby_client_rekey(const tabby_client *existing, tabby_client *C, const void
 	client_internal *old_state = (client_internal *)existing;
 	client_internal *state = (client_internal *)C;
 
+	// Input validation
 	if (!existing || !C || !client_request || state->flag != FLAG_INIT) {
 		return -1;
 	}
 
+	// Derive a new generator from the old one, which does not reseed.
+	// This is this main point of using tabby_client_rekey() instead of
+	// tabby_client_gen() because the rekeying does not consume more
+	// /dev/random randomness and avoids blocking.
 	if (cymric_derive(&state->rng, &old_state->rng, seed, seed_bytes)) {
 		return -1;
 	}
 
+	// Use the same key pair as before.  There is no reason to change it
+	// since the session secret varies with the client's nonce.
 	memcpy(state->private_key, old_state->private_key, 32);
 	memcpy(state->public_key, old_state->public_key, 64);
 
+	// Generate a new random client nonce.
+	// This is the main result of rekeying, and it makes it impossible
+	// for a malicious server to replay a previously recorded session
+	// with a legitimate server and arrive at the same session key.
 	if (cymric_random(&state->rng, state->nonce, 32)) {
 		return -1;
 	}
 
+	// Fill the client request object
 	memcpy(client_request, state->public_key, 64);
 	memcpy(client_request + 64, state->nonce, 32);
 
+	// Set the initialized flag for sanity checking later
 	state->flag = FLAG_INIT;
 
 	return 0;
@@ -290,10 +328,12 @@ int tabby_client_rekey(const tabby_client *existing, tabby_client *C, const void
 int tabby_get_public_key(tabby_server *S, char public_key[64]) {
 	server_internal *state = (server_internal *)S;
 
+	// Validate input and make sure the server object was initialized
 	if (!S || !public_key || state->flag != FLAG_INIT) {
 		return -1;
 	}
 
+	// Copy out the public key
 	memcpy(public_key, state->public_key, 64);
 
 	return 0;
@@ -302,10 +342,15 @@ int tabby_get_public_key(tabby_server *S, char public_key[64]) {
 int tabby_server_save(tabby_server *S, char server_data[64]) {
 	server_internal *state = (server_internal *)S;
 
+	// Validate input and make sure the server object was initialized
 	if (!S || !server_data || state->flag != FLAG_INIT) {
 		return -1;
 	}
 
+	// Copy out the private and sign keys, which need to
+	// persist between server runs.  The public key can
+	// be trivially derived during loading, which avoids
+	// the potential for corruption at least for that.
 	memcpy(server_data, state->private_key, 32);
 	memcpy(server_data + 32, state->sign_key, 32);
 
@@ -315,26 +360,34 @@ int tabby_server_save(tabby_server *S, char server_data[64]) {
 int tabby_server_load(tabby_server *S, const void *seed, int seed_bytes, const char server_data[64]) {
 	server_internal *state = (server_internal *)S;
 
+	// Validate input
 	if (!S || !server_data) {
 		return -1;
 	}
 
+	// Copy the private and sign keys into the target location
 	memcpy(state->private_key, server_data, 32);
 	memcpy(state->sign_key, server_data + 32, 32);
 
+	// Regenerate the public key from the private key
 	if (snowshoe_mul_gen(state->private_key, state->public_key)) {
 		return -1;
 	}
 
+	// Reseed the Cymric RNG for generating nonces and ephemeral key pairs
 	if (cymric_seed(&state->rng, seed, seed_bytes)) {
 		return -1;
 	}
 
+	// Generate the server's ephemeral key pair
 	if (generate_key(&state->rng, state->private_ephemeral, state->public_ephemeral)) {
 		return -1;
 	}
 
+	// Flag the object as being initialized for sanity checking later
 	state->flag = FLAG_INIT;
+
+	// Flag that we want a rekey initially
 	state->flag_rekey = FLAG_NEED_REKEY;
 
 	return 0;
