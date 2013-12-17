@@ -68,14 +68,17 @@ static const u32 FLAG_NEED_REKEY = 1;
 static const u32 FLAG_REKEY_DONE = 2;
 
 static void generate_key(cymric_rng *rng, char private_key[32], char public_key[64]) {
+	char key[64];
+
 	do {
-		char key[64];
 		cymric_random(rng, key, 64);
 
 		snowshoe_mod_q(key, private_key);
 	} while (snowshoe_mul_gen(private_key, public_key));
 
 	// Note that snowshoe will validate the private key for us
+
+	CAT_SECURE_CLR(key, sizeof(key));
 }
 
 #ifdef __cplusplus
@@ -254,6 +257,9 @@ int tabby_sign(tabby_server *S, const void *message, int bytes, char signature[9
 	char *s = signature + 64;
 	snowshoe_mul_mod_q(t, state->private_key, r, s);
 
+	CAT_SECURE_CLR(r, sizeof(r));
+	CAT_SECURE_CLR(t, sizeof(t));
+
 	return 0;
 }
 
@@ -289,6 +295,8 @@ int tabby_verify(const void *message, int bytes, const char public_key[64], char
 	if (snowshoe_equals4(u, R)) {
 		return -1;
 	}
+
+	// No need to clear sensitive data from memory here: It is all public knowledge
 
 	return 0;
 }
