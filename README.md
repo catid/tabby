@@ -43,7 +43,9 @@ One-round EC-DH with forward secrecy:
 + Tabby client handshake: `205504` median cycles, `78.8678` avg usec
 
 Each of these operations takes roughly 2-3 usec longer than the Snowshoe math
-routines they are based on.
+routines they are based on.  Where applicable, these operations do full input
+validation, use good random number sources, run in constant time, and clean
+up the stack to avoid leaking sensitive information.
 
 
 #### Tabby Key Generation Process : Algorithm 1
