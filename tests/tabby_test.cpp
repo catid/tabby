@@ -258,7 +258,7 @@ int main() {
 
 	cout << "+ Tabby client rekey: `" << dec << mr << "` median cycles, `" << wr << "` avg usec" << endl;
 	cout << "+ Tabby server handshake: `" << dec << ms << "` median cycles, `" << ws << "` avg usec" << endl;
-	cout << "+ Tabby client handshake: `" << dec << mc << "` median cycles, " << wc << "` avg usec" << endl;
+	cout << "+ Tabby client handshake: `" << dec << mc << "` median cycles, `" << wc << "` avg usec" << endl;
 
 	cout << "Tests succeeded!" << endl;
 

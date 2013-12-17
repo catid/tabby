@@ -28,19 +28,19 @@ for each configuration, unless otherwise noted.
 
 Key generation:
 
-+ Successfully created a new server key in `185688` cycles, `88` usec (one sample)
-+ Generated a client key in `65444` cycles, `36` usec (one sample)
-+ Periodic server rekey in `64300` cycles, `25` usec (one sample)
++ Successfully created a new server key in `378024` cycles, `178` usec (one sample)
++ Generated a client key in `184684` cycles, `86` usec (one sample)
++ Periodic server rekey in `189312` cycles, `75` usec (one sample)
 
 Signatures:
 
-+ Tabby sign: `68672` median cycles, `25.9993` avg usec
-+ Tabby verify signature: `163324` median cycles, `61.7676` avg usec
++ Tabby sign: `68672` median cycles, `26.3009` avg usec
++ Tabby verify signature: `163420` median cycles, `62.4262` avg usec
 
 One-round EC-DH with forward secrecy:
 
-+ Tabby server handshake: `143180` median cycles, `54.1224` avg usec
-+ Tabby client handshake: `205944` median cycles, `77.7556` avg usec
++ Tabby server handshake: `144472` median cycles, `55.464` avg usec
++ Tabby client handshake: `205504` median cycles, `78.8678` avg usec
 
 Each of these operations takes roughly 2-3 usec longer than the Snowshoe math
 routines they are based on.
