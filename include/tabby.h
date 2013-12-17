@@ -60,6 +60,9 @@ typedef struct {
  *
  * You may optionally provide extra random number data as a seed to improve
  * the quality of the generated keys; otherwise pass NULL for seed.
+ *
+ * Returns 0 on success.
+ * Returns non-zero if the input data is invalid.
  */
 extern int tabby_server_gen(tabby_server *S, const void *seed, int seed_bytes);
 
@@ -82,6 +85,9 @@ extern int tabby_server_rekey(tabby_server *S, const void *seed, int seed_bytes)
  *
  * You may optionally provide extra random number data as a seed to improve
  * the quality of the generated keys; otherwise pass NULL for seed.
+ *
+ * Returns 0 on success.
+ * Returns non-zero if the input data is invalid.
  */
 extern int tabby_client_gen(tabby_client *C, const void *seed, int seed_bytes, char client_request[96]);
 
