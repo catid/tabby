@@ -124,7 +124,7 @@ static bool is_zero(const char x[32]) {
 static bool is_equal(const char x[32], const char y[32]) {
 	const u64 *k = (const u64 *)x;
 	const u64 *l = (const u64 *)y;
-	const u64 zero = (k[0] ^ l[0]) | (k[1] ^ l[1]) | (k[2] ^ l[2]) | (k[3] ^ l[2]);
+	const u64 zero = (k[0] ^ l[0]) | (k[1] ^ l[1]) | (k[2] ^ l[2]) | (k[3] ^ l[3]);
 	const u32 z = (u32)(zero | (zero >> 32));
 	return z == 0;
 }
@@ -169,7 +169,6 @@ static int generate_key(cymric_rng *rng, char private_key[32], char public_key[6
 		// due to masking bits, then the resulting value `k` has a
 		// large bias according to some 18-bit simulations.  So to avoid
 		// this problem, strong uniformly-distributed keys are used.
-
 	} while (snowshoe_mul_gen(private_key, public_key));
 
 	return 0;
@@ -396,17 +395,19 @@ int tabby_server_load(tabby_server *S, const void *seed, int seed_bytes, const c
 int tabby_sign(tabby_server *S, const void *message, int bytes, char signature[96]) {
 	server_internal *state = (server_internal *)S;
 
+	// If library is not initialized,
 	if (!m_initialized) {
 		return -1;
 	}
 
-	if (state->flag != FLAG_INIT) {
+	// If input is invalid or server object is not initialized,
+	if (!state || !message || bytes <= 0 || !signature || state->flag != FLAG_INIT) {
 		return -1;
 	}
 
-	if (!state || !message || bytes <= 0 || !signature) {
-		return -1;
-	}
+	// Hash the signature key with the message to produce a random value,
+	// rather than generating a random value, which is a trick recommended
+	// by the Ed25519 paper.
 
 	// r = BLAKE2(sign_key, M) mod q
 	char r[64];
@@ -415,11 +416,19 @@ int tabby_sign(tabby_server *S, const void *message, int bytes, char signature[9
 	}
 	snowshoe_mod_q(r, r);
 
+	// This produces a random value in 0...q-1, which is very unlikely
+	// to be zero.  As implemented, the signature will fail in this case.
+	// This means that a very small number of messages cannot be signed,
+	// but it is incredibly unlikely to ever happen.
+
 	// R = rG
 	char *R = signature;
 	if (snowshoe_mul_gen(r, R)) {
 		return -1;
 	}
+
+	// Hash the public key, R, and the message together and reduce the
+	// 512-bit result modulo q.
 
 	// t = BLAKE2(SP, R, M) mod q
 	char t[64];
@@ -671,7 +680,7 @@ int tabby_client_handshake(tabby_client *C, const char server_public_key[64], co
 	}
 
 	// Verify the high 32 bytes of k matches PROOF
-	if (is_equal(PROOF, k + 32)) {
+	if (!is_equal(PROOF, k + 32)) {
 		return -1;
 	}
 
