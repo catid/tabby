@@ -34,8 +34,8 @@ Key generation:
 
 Signatures:
 
-+ Tabby sign: `68672` median cycles, `25.7507` avg usec
-+ Tabby verify signature: `163420` median cycles, `61.1933` avg usec
++ Tabby sign: `69288` median cycles, `25.939` avg usec
++ Tabby verify signature: `161924` median cycles, `60.4852` avg usec
 
 One-round EC-DH with forward secrecy:
 

@@ -169,7 +169,7 @@ static int generate_key(cymric_rng *rng, char private_key[32], char public_key[6
 		// due to masking bits, then the resulting value `k` has a
 		// large bias according to some 18-bit simulations.  So to avoid
 		// this problem, strong uniformly-distributed keys are used.
-	} while (snowshoe_mul_gen(private_key, public_key));
+	} while (snowshoe_mul_gen(private_key, public_key, 0));
 
 	return 0;
 }
@@ -369,7 +369,7 @@ int tabby_server_load(tabby_server *S, const void *seed, int seed_bytes, const c
 	memcpy(state->sign_key, server_data + 32, 32);
 
 	// Regenerate the public key from the private key
-	if (snowshoe_mul_gen(state->private_key, state->public_key)) {
+	if (snowshoe_mul_gen(state->private_key, state->public_key, 0)) {
 		return -1;
 	}
 
@@ -423,12 +423,12 @@ int tabby_sign(tabby_server *S, const void *message, int bytes, char signature[9
 
 	// R = rG
 	char *R = signature;
-	if (snowshoe_mul_gen(r, R)) {
+	if (snowshoe_mul_gen(r, R, 1)) {
 		return -1;
 	}
 
 	// Hash the public key, R, and the message together and reduce the
-	// 512-bit result modulo q.
+	// 512-bit result modulo q.  This is H(R,A,M) from Ed25519.
 
 	// t = BLAKE2(SP, R, M) mod q
 	char t[64];
@@ -439,6 +439,8 @@ int tabby_sign(tabby_server *S, const void *message, int bytes, char signature[9
 	blake2b_update(&B, (const u8 *)message, bytes);
 	blake2b_final(&B, (u8 *)t, 64);
 	snowshoe_mod_q(t, t);
+
+	// Combine the two uniformly distributed keys with the private key:
 
 	// s = r + t*SS (mod q)
 	char *s = signature + 64;
@@ -451,13 +453,17 @@ int tabby_sign(tabby_server *S, const void *message, int bytes, char signature[9
 }
 
 int tabby_verify(const void *message, int bytes, const char public_key[64], char signature[96]) {
+	// If library is not initialized,
 	if (!m_initialized) {
 		return -1;
 	}
 
+	// If input is invalid,
 	if (!public_key || !message || bytes <= 0 || !signature) {
 		return -1;
 	}
+
+	// Reconstruct the same hash as on the server.  This is H(R,A,M) from Ed25519.
 
 	// t = BLAKE2(SP, R, M) mod q
 	char *R = signature;
@@ -470,6 +476,9 @@ int tabby_verify(const void *message, int bytes, const char public_key[64], char
 	blake2b_final(&B, (u8 *)t, 64);
 	snowshoe_mod_q(t, t);
 
+	// Negate the public key and perform a simultaneous multiplication as in Ed25519
+	// to check the signature.
+
 	// u = sG - tSP
 	char u[64];
 	char *s = signature + 64;
@@ -478,9 +487,14 @@ int tabby_verify(const void *message, int bytes, const char public_key[64], char
 		return -1;
 	}
 
-	// 4*R ?= u
-	if (snowshoe_equals4(u, R)) {
-		return -1;
+	// Check if the points match.  This does not need to be done in constant-time.
+
+	const u64 *X = (const u64 *)u;
+	const u64 *Y = (const u64 *)R;
+	for (int ii = 0; ii < 8; ++ii) {
+		if (X[ii] != Y[ii]) {
+			return -1;
+		}
 	}
 
 	// No need to clear sensitive data from memory here: It is all public knowledge
