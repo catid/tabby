@@ -67,7 +67,7 @@ int tabby_sign(tabby_server *S, const void *message, int bytes, char signature[9
 	// This means that a very small number of messages cannot be signed,
 	// but it is incredibly unlikely to ever happen.
 
-	// R = rG
+	// R = r*4*G
 	char *R = signature;
 	if (snowshoe_mul_gen(r, R, 1)) {
 		return -1;
