@@ -39,7 +39,7 @@ Signatures:
 
 One-round EC-DH with forward secrecy:
 
-+ Tabby server handshake: `144472` median cycles, `53.7942` avg usec
++ Tabby server handshake: `144472` median cycles, `54.3095` avg usec (`18412` connections/second)
 + Tabby client handshake: `205504` median cycles, `77.3729` avg usec
 
 Each of these operations takes roughly 2-3 usec longer than the Snowshoe math
@@ -92,7 +92,7 @@ Server online processing:
 + Verify in constant-time that h != 0.  If so, start over.
 + e = SS * h + ES (mod q) with Snowshoe.
 + Verify in constant-time that e != 0.  If so, start over.
-+ T(X,Y) = e * SP with Snowshoe.
++ T(X,Y) = e * CP with Snowshoe.
 + k = BLAKE2(H, T) : 64 bytes.
 + Session key is the low 32 bytes of k.
 + The high 32 bytes of k is the server proof of key knowledge (PROOF).
@@ -115,8 +115,8 @@ Client online processing:
 + Session key is the low 32 bytes of k'.
 + Verify the high 32 bytes of k' matches PROOF.
 
-Both parties now have a public key.
-The server has been authenticated by the client.
+At this end of this protocol, both parties now have a shared 256-bit secret key
+and the server has been authenticated by the client.
 
 #### Discussion of Performance
 

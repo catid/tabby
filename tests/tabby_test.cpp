@@ -102,7 +102,7 @@ int main() {
 	u32 c1 = Clock::cycles();
 	double t1 = m_clock.usec();
 
-	assert(0 == tabby_get_public_key(&s, public_key));
+	assert(0 == tabby_server_get_public_key(&s, public_key));
 
 	cout << "+ Successfully created a new server key in " << (c1 - c0) << " cycles, " << (t1 - t0) << " usec" << endl;
 
@@ -256,8 +256,10 @@ int main() {
 	u32 mc = quick_select(&tc[0], (int)tc.size());
 	wc /= tc.size();
 
+	int cps = (int)(1000000.0 / ws);
+
 	cout << "+ Tabby client rekey: `" << dec << mr << "` median cycles, `" << wr << "` avg usec" << endl;
-	cout << "+ Tabby server handshake: `" << dec << ms << "` median cycles, `" << ws << "` avg usec" << endl;
+	cout << "+ Tabby server handshake: `" << dec << ms << "` median cycles, `" << ws << "` avg usec (`" << cps << "` connections/second)" << endl;
 	cout << "+ Tabby client handshake: `" << dec << mc << "` median cycles, `" << wc << "` avg usec" << endl;
 
 	cout << "Tests succeeded!" << endl;
