@@ -89,6 +89,6 @@ tabby_test.o : tests/tabby_test.cpp
 .PHONY : clean
 
 clean :
-	#git submodule update --init
+	git submodule update --init
 	-rm test libtabby.a $(shared_test_o) $(tabby_test_o) $(tabby_o)
 
