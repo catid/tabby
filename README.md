@@ -184,5 +184,5 @@ attack is impossible.
 #### Credits
 
 This software was written entirely by myself ( Christopher A. Taylor <mrcatid@gmail.com> ).  If you
-find it useful and would like to buy me a coffee, consider [tipping](https://www.gettip.com/catid/).
+find it useful and would like to buy me a coffee, consider [tipping](https://www.gittip.com/catid/).
 
