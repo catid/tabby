@@ -102,8 +102,9 @@ int tabby_sign(tabby_server *S, const void *message, int bytes, char signature[9
 	snowshoe_mul_mod_q(t, state->private_key, r, s);
 
 	CAT_SECURE_OBJCLR(r);
-	CAT_SECURE_OBJCLR(t);
-	CAT_SECURE_OBJCLR(B);
+
+	// No need to erase B or t because they contain public information
+	// that the verifier will actually reproduce
 
 	return 0;
 }
