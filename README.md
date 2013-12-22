@@ -183,6 +183,6 @@ attack is impossible.
 
 #### Credits
 
-This software was written entirely by myself (Christopher A. Taylor).  If you
-find it useful and want to buy me a coffee, consider [tipping](https://www.gettip.com/catid/).
+This software was written entirely by myself ( Christopher A. Taylor <mrcatid@gmail.com> ).  If you
+find it useful and would like to buy me a coffee, consider [tipping](https://www.gettip.com/catid/).
 
