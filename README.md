@@ -180,3 +180,9 @@ attack is impossible.
 + Read through code again and look for bugs
 + Analyze the protocol to make sure it is solid
 
+
+#### Credits
+
+This software was written entirely by myself (Christopher A. Taylor).  If you
+find it useful and want to buy me a coffee, consider [tipping](https://www.gettip.com/catid/).
+
