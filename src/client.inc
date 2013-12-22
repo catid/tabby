@@ -118,7 +118,8 @@ int tabby_client_rekey(const tabby_client *existing, tabby_client *C, const void
 		return -1;
 	}
 
-	// Fill the client request object
+	// Construct the request object, which is:
+	// (client public key[64]) (client nonce[32])
 	memcpy(client_request, state->public_key, 64);
 	memcpy(client_request + 64, state->nonce, 32);
 
@@ -131,18 +132,17 @@ int tabby_client_rekey(const tabby_client *existing, tabby_client *C, const void
 int tabby_client_handshake(tabby_client *C, const char server_public_key[64], const char server_response[128], char secret_key[32]) {
 	client_internal *state = (client_internal *)C;
 
+	// If library is not initialized.
 	if (!m_initialized) {
 		return -1;
 	}
 
-	if (state->flag != FLAG_INIT) {
+	// If input is invalid or the client object is uninitialized,
+	if (!state || !server_public_key || !server_response || !secret_key || state->flag != FLAG_INIT) {
 		return -1;
 	}
 
-	if (!state || !server_public_key || !server_response || !secret_key) {
-		return -1;
-	}
-
+	// Allocate stack space for sensitive data, overlapping to reduce the area to erase
 	char T[64+64+32];
 	char *H = T + 64;
 	char *h = T + 64+64;
@@ -151,6 +151,8 @@ int tabby_client_handshake(tabby_client *C, const char server_public_key[64], co
 	const char *EP = server_response;
 	const char *SN = server_response + 64;
 	const char *PROOF = server_response + 96;
+
+	// Reconstruct H from the public information
 
 	// H = BLAKE2(CP, CN, EP, SP, SN)
 	blake2b_state B;
@@ -179,6 +181,10 @@ int tabby_client_handshake(tabby_client *C, const char server_public_key[64], co
 	// h = H mod q
 	snowshoe_mod_q(H, h);
 
+	// h can take on values in the range 0..q-1 in general, but the server
+	// should not have generated an h = 0 since it adjusts its nonce until
+	// this is no longer the case, so we should validate h != 0.
+
 	// Validate h != 0.
 	if (is_zero(h)) {
 		return -1;
@@ -187,15 +193,16 @@ int tabby_client_handshake(tabby_client *C, const char server_public_key[64], co
 	// d = h * CS (mod q)
 	snowshoe_mul_mod_q(h, state->private_key, 0, d);
 
-	// Validate that d != 0
-	if (is_zero(d)) {
-		return -1;
-	}
+	// While d can be zero here, we do not need to explicitly check because
+	// the snowshoe_simul function will validate its input in constant-time.
 
 	// T = CS * EP + d * SP
 	if (snowshoe_simul(state->private_key, EP, d, server_public_key, T)) {
 		return -1;
 	}
+
+	// Hash the secret point T with the public information H to arrive at
+	// the session secret key k.
 
 	// k = BLAKE2(T, H)
 	if (blake2b_init(&B, 64)) {

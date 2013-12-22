@@ -193,17 +193,19 @@ int tabby_server_load_secret(tabby_server *S, const void *seed, int seed_bytes, 
 int tabby_server_rekey(tabby_server *S, const void *seed, int seed_bytes) {
 	server_internal *state = (server_internal *)S;
 
+	// If library is not initialized,
 	if (!m_initialized) {
 		return -1;
 	}
 
+	// If server object is not initialized,
 	if (state->flag != FLAG_INIT) {
 		return -1;
 	}
 
 	// If a new key is requested,
 	if (state->flag_rekey == FLAG_NEED_REKEY) {
-		CAT_FENCE_COMPILER;
+		CAT_FENCE_COMPILER; // Prevents compiler re-ordering instructions
 
 		// Copy RNG state
 		memcpy(&state->rng_rekey, &state->rng, sizeof(state->rng_rekey));
@@ -218,7 +220,7 @@ int tabby_server_rekey(tabby_server *S, const void *seed, int seed_bytes) {
 			return -1;
 		}
 
-		CAT_FENCE_COMPILER;
+		CAT_FENCE_COMPILER; // Prevents compiler re-ordering instructions
 
 		// Flag rekey complete
 		state->flag_rekey = FLAG_REKEY_DONE;
@@ -230,21 +232,19 @@ int tabby_server_rekey(tabby_server *S, const void *seed, int seed_bytes) {
 int tabby_server_handshake(tabby_server *S, const char client_request[96], char server_response[128], char secret_key[32]) {
 	server_internal *state = (server_internal *)S;
 
+	// If library is not initialized,
 	if (!m_initialized) {
 		return -1;
 	}
 
-	if (state->flag != FLAG_INIT) {
-		return -1;
-	}
-
-	if (!state || !client_request || !server_response || !secret_key) {
+	// If input is invalid or server object is uninitialized,
+	if (!state || !client_request || !server_response || !secret_key || state->flag != FLAG_INIT) {
 		return -1;
 	}
 
 	// If rekeying is complete,
 	if (state->flag_rekey == FLAG_REKEY_DONE) {
-		CAT_FENCE_COMPILER;
+		CAT_FENCE_COMPILER; // Prevents compiler from re-ordering instructions
 
 		// Copy over the generated ephemeral key pair
 		memcpy(state->private_ephemeral, state->private_rekey, 32);
@@ -253,12 +253,13 @@ int tabby_server_handshake(tabby_server *S, const char client_request[96], char 
 		// Copy over the new RNG state
 		memcpy(&state->rng, &state->rng_rekey, sizeof(state->rng));
 
-		CAT_FENCE_COMPILER;
+		CAT_FENCE_COMPILER; // Prevents compiler from re-ordering instructions
 
 		// Allow thread to rekey again
 		state->flag_rekey = FLAG_NEED_REKEY;
 	}
 
+	// Allocate overlapping stack objects to make erasing easier
 	char T[64+64+32];
 	char *H = T + 64;
 	char *h = T + 64+64;
@@ -308,13 +309,13 @@ int tabby_server_handshake(tabby_server *S, const char client_request[96], char 
 		// e = h * SS + ES (mod q)
 		snowshoe_mul_mod_q(h, state->private_key, state->private_ephemeral, e);
 
-		// If e == 0, choose a new SN and start over.
-	} while (is_zero(e));
+		// T = e * SP
+		// If e is zero, select a new nonce and try again.  This check is performed
+		// in constant-time by snowshoe_mul.
+	} while (snowshoe_mul(e, client_public, T));
 
-	// T = e * SP
-	if (snowshoe_mul(e, client_public, T)) {
-		return -1;
-	}
+	// Hash the secret point T with the public information hash H to arrive at
+	// the session secret key k.
 
 	// k = BLAKE2(T, H)
 	if (blake2b_init(&B, 64)) {
