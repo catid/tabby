@@ -89,27 +89,27 @@ int tabby_server_gen(tabby_server *S, const void *seed, int seed_bytes) {
 	server_internal *state = (server_internal *)S;
 
 	// Input validation
-	if (!S) {
+	if CAT_UNLIKELY(!S) {
 		return -1;
 	}
 
 	// Reseed the generator
-	if (cymric_seed(&state->rng, seed, seed_bytes)) {
+	if CAT_UNLIKELY(cymric_seed(&state->rng, seed, seed_bytes)) {
 		return -1;
 	}
 
 	// Generate the long-term key pair
-	if (generate_key(&state->rng, state->private_key, state->public_key)) {
+	if CAT_UNLIKELY(generate_key(&state->rng, state->private_key, state->public_key)) {
 		return -1;
 	}
 
 	// Generate the long-term signing key
-	if (cymric_random(&state->rng, state->sign_key, 32)) {
+	if CAT_UNLIKELY(cymric_random(&state->rng, state->sign_key, 32)) {
 		return -1;
 	}
 
 	// Generate the ephemeral key pair
-	if (generate_key(&state->rng, state->private_ephemeral, state->public_ephemeral)) {
+	if CAT_UNLIKELY(generate_key(&state->rng, state->private_ephemeral, state->public_ephemeral)) {
 		return -1;
 	}
 
@@ -126,7 +126,7 @@ int tabby_server_get_public_key(tabby_server *S, char public_key[64]) {
 	server_internal *state = (server_internal *)S;
 
 	// Validate input and make sure the server object was initialized
-	if (!S || !public_key || state->flag != FLAG_INIT) {
+	if CAT_UNLIKELY(!S || !public_key || state->flag != FLAG_INIT) {
 		return -1;
 	}
 
@@ -140,7 +140,7 @@ int tabby_server_save_secret(tabby_server *S, char server_data[64]) {
 	server_internal *state = (server_internal *)S;
 
 	// Validate input and make sure the server object was initialized
-	if (!S || !server_data || state->flag != FLAG_INIT) {
+	if CAT_UNLIKELY(!S || !server_data || state->flag != FLAG_INIT) {
 		return -1;
 	}
 
@@ -158,7 +158,7 @@ int tabby_server_load_secret(tabby_server *S, const void *seed, int seed_bytes, 
 	server_internal *state = (server_internal *)S;
 
 	// Validate input
-	if (!S || !server_data) {
+	if CAT_UNLIKELY(!S || !server_data) {
 		return -1;
 	}
 
@@ -167,17 +167,17 @@ int tabby_server_load_secret(tabby_server *S, const void *seed, int seed_bytes, 
 	memcpy(state->sign_key, server_data + 32, 32);
 
 	// Regenerate the public key from the private key
-	if (snowshoe_mul_gen(state->private_key, state->public_key, 0)) {
+	if CAT_UNLIKELY(snowshoe_mul_gen(state->private_key, state->public_key, 0)) {
 		return -1;
 	}
 
 	// Reseed the Cymric RNG for generating nonces and ephemeral key pairs
-	if (cymric_seed(&state->rng, seed, seed_bytes)) {
+	if CAT_UNLIKELY(cymric_seed(&state->rng, seed, seed_bytes)) {
 		return -1;
 	}
 
 	// Generate the server's ephemeral key pair
-	if (generate_key(&state->rng, state->private_ephemeral, state->public_ephemeral)) {
+	if CAT_UNLIKELY(generate_key(&state->rng, state->private_ephemeral, state->public_ephemeral)) {
 		return -1;
 	}
 
@@ -194,12 +194,12 @@ int tabby_server_rekey(tabby_server *S, const void *seed, int seed_bytes) {
 	server_internal *state = (server_internal *)S;
 
 	// If library is not initialized,
-	if (!m_initialized) {
+	if CAT_UNLIKELY(!m_initialized) {
 		return -1;
 	}
 
 	// If server object is not initialized,
-	if (state->flag != FLAG_INIT) {
+	if CAT_UNLIKELY(state->flag != FLAG_INIT) {
 		return -1;
 	}
 
@@ -211,12 +211,12 @@ int tabby_server_rekey(tabby_server *S, const void *seed, int seed_bytes) {
 		memcpy(&state->rng_rekey, &state->rng, sizeof(state->rng_rekey));
 
 		// Seed new RNG
-		if (cymric_seed(&state->rng_rekey, seed, seed_bytes)) {
+		if CAT_UNLIKELY(cymric_seed(&state->rng_rekey, seed, seed_bytes)) {
 			return -1;
 		}
 
 		// Generate ephemeral key pair
-		if (generate_key(&state->rng_rekey, state->private_rekey, state->public_rekey)) {
+		if CAT_UNLIKELY(generate_key(&state->rng_rekey, state->private_rekey, state->public_rekey)) {
 			return -1;
 		}
 
@@ -233,12 +233,13 @@ int tabby_server_handshake(tabby_server *S, const char client_request[96], char 
 	server_internal *state = (server_internal *)S;
 
 	// If library is not initialized,
-	if (!m_initialized) {
+	if CAT_UNLIKELY(!m_initialized) {
 		return -1;
 	}
 
 	// If input is invalid or server object is uninitialized,
-	if (!state || !client_request || !server_response || !secret_key || state->flag != FLAG_INIT) {
+	if CAT_UNLIKELY(!state || !client_request || !server_response ||
+		!secret_key || state->flag != FLAG_INIT) {
 		return -1;
 	}
 
@@ -273,30 +274,30 @@ int tabby_server_handshake(tabby_server *S, const char client_request[96], char 
 	do {
 		do {
 			// Generate server nonce SN
-			if (cymric_random(&state->rng, nonce, 32)) {
+			if CAT_UNLIKELY(cymric_random(&state->rng, nonce, 32)) {
 				return -1;
 			}
 
 			// H = BLAKE2(CP, CN, EP, SP, SN)
-			if (blake2b_init(&B, 64)) {
+			if CAT_UNLIKELY(blake2b_init(&B, 64)) {
 				return -1;
 			}
-			if (blake2b_update(&B, (const u8 *)client_public, 64)) {
+			if CAT_UNLIKELY(blake2b_update(&B, (const u8 *)client_public, 64)) {
 				return -1;
 			}
-			if (blake2b_update(&B, (const u8 *)client_nonce, 32)) {
+			if CAT_UNLIKELY(blake2b_update(&B, (const u8 *)client_nonce, 32)) {
 				return -1;
 			}
-			if (blake2b_update(&B, (const u8 *)state->public_ephemeral, 64)) {
+			if CAT_UNLIKELY(blake2b_update(&B, (const u8 *)state->public_ephemeral, 64)) {
 				return -1;
 			}
-			if (blake2b_update(&B, (const u8 *)state->public_key, 64)) {
+			if CAT_UNLIKELY(blake2b_update(&B, (const u8 *)state->public_key, 64)) {
 				return -1;
 			}
-			if (blake2b_update(&B, (const u8 *)nonce, 32)) {
+			if CAT_UNLIKELY(blake2b_update(&B, (const u8 *)nonce, 32)) {
 				return -1;
 			}
-			if (blake2b_final(&B, (u8 *)H, 64)) {
+			if CAT_UNLIKELY(blake2b_final(&B, (u8 *)H, 64)) {
 				return -1;
 			}
 
@@ -304,7 +305,7 @@ int tabby_server_handshake(tabby_server *S, const char client_request[96], char 
 			snowshoe_mod_q(H, h);
 
 			// If h == 0, choose a new SN and start over.
-		} while (is_zero(h));
+		} while CAT_UNLIKELY(is_zero(h));
 
 		// e = h * SS + ES (mod q)
 		snowshoe_mul_mod_q(h, state->private_key, state->private_ephemeral, e);
@@ -312,19 +313,19 @@ int tabby_server_handshake(tabby_server *S, const char client_request[96], char 
 		// T = e * SP
 		// If e is zero, select a new nonce and try again.  This check is performed
 		// in constant-time by snowshoe_mul.
-	} while (snowshoe_mul(e, client_public, T));
+	} while CAT_UNLIKELY(snowshoe_mul(e, client_public, T));
 
 	// Hash the secret point T with the public information hash H to arrive at
 	// the session secret key k.
 
 	// k = BLAKE2(T, H)
-	if (blake2b_init(&B, 64)) {
+	if CAT_UNLIKELY(blake2b_init(&B, 64)) {
 		return -1;
 	}
-	if (blake2b_update(&B, (const u8 *)T, 128)) {
+	if CAT_UNLIKELY(blake2b_update(&B, (const u8 *)T, 128)) {
 		return -1;
 	}
-	if (blake2b_final(&B, (u8 *)k, 64)) {
+	if CAT_UNLIKELY(blake2b_final(&B, (u8 *)k, 64)) {
 		return -1;
 	}
 

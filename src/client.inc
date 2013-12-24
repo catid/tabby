@@ -51,17 +51,17 @@ int tabby_client_gen(tabby_client *C, const void *seed, int seed_bytes, char cli
 	client_internal *state = (client_internal *)C;
 
 	// Input validation
-	if (!C || !client_request) {
+	if CAT_UNLIKELY(!C || !client_request) {
 		return -1;
 	}
 
 	// Reseed the generator
-	if (cymric_seed(&state->rng, seed, seed_bytes)) {
+	if CAT_UNLIKELY(cymric_seed(&state->rng, seed, seed_bytes)) {
 		return -1;
 	}
 
 	// Generate the client's ephemeral key pair
-	if (generate_key(&state->rng, state->private_key, state->public_key)) {
+	if CAT_UNLIKELY(generate_key(&state->rng, state->private_key, state->public_key)) {
 		return -1;
 	}
 
@@ -73,7 +73,7 @@ int tabby_client_gen(tabby_client *C, const void *seed, int seed_bytes, char cli
 	// to mitigate problems that should never occur anyway.
 
 	// Generate a random nonce
-	if (cymric_random(&state->rng, state->nonce, 32)) {
+	if CAT_UNLIKELY(cymric_random(&state->rng, state->nonce, 32)) {
 		return -1;
 	}
 
@@ -93,7 +93,7 @@ int tabby_client_rekey(const tabby_client *existing, tabby_client *C, const void
 	client_internal *state = (client_internal *)C;
 
 	// Input validation
-	if (!existing || !C || !client_request || old_state->flag != FLAG_INIT) {
+	if CAT_UNLIKELY(!existing || !C || !client_request || old_state->flag != FLAG_INIT) {
 		return -1;
 	}
 
@@ -101,12 +101,12 @@ int tabby_client_rekey(const tabby_client *existing, tabby_client *C, const void
 	// This is this main point of using tabby_client_rekey() instead of
 	// tabby_client_gen() because the rekeying does not consume more
 	// /dev/random randomness and avoids blocking.
-	if (cymric_derive(&state->rng, &old_state->rng, seed, seed_bytes)) {
+	if CAT_UNLIKELY(cymric_derive(&state->rng, &old_state->rng, seed, seed_bytes)) {
 		return -1;
 	}
 
 	// Generate the client's ephemeral key pair
-	if (generate_key(&state->rng, state->private_key, state->public_key)) {
+	if CAT_UNLIKELY(generate_key(&state->rng, state->private_key, state->public_key)) {
 		return -1;
 	}
 
@@ -114,7 +114,7 @@ int tabby_client_rekey(const tabby_client *existing, tabby_client *C, const void
 	// This is the main result of rekeying, and it makes it impossible
 	// for a malicious server to replay a previously recorded session
 	// with a legitimate server and arrive at the same session key.
-	if (cymric_random(&state->rng, state->nonce, 32)) {
+	if CAT_UNLIKELY(cymric_random(&state->rng, state->nonce, 32)) {
 		return -1;
 	}
 
@@ -133,12 +133,13 @@ int tabby_client_handshake(tabby_client *C, const char server_public_key[64], co
 	client_internal *state = (client_internal *)C;
 
 	// If library is not initialized.
-	if (!m_initialized) {
+	if CAT_UNLIKELY(!m_initialized) {
 		return -1;
 	}
 
 	// If input is invalid or the client object is uninitialized,
-	if (!state || !server_public_key || !server_response || !secret_key || state->flag != FLAG_INIT) {
+	if CAT_UNLIKELY(!state || !server_public_key || !server_response ||
+		!secret_key || state->flag != FLAG_INIT) {
 		return -1;
 	}
 
@@ -156,25 +157,25 @@ int tabby_client_handshake(tabby_client *C, const char server_public_key[64], co
 
 	// H = BLAKE2(CP, CN, EP, SP, SN)
 	blake2b_state B;
-	if (blake2b_init(&B, 64)) {
+	if CAT_UNLIKELY(blake2b_init(&B, 64)) {
 		return -1;
 	}
-	if (blake2b_update(&B, (const u8 *)state->public_key, 64)) {
+	if CAT_UNLIKELY(blake2b_update(&B, (const u8 *)state->public_key, 64)) {
 		return -1;
 	}
-	if (blake2b_update(&B, (const u8 *)state->nonce, 32)) {
+	if CAT_UNLIKELY(blake2b_update(&B, (const u8 *)state->nonce, 32)) {
 		return -1;
 	}
-	if (blake2b_update(&B, (const u8 *)EP, 64)) {
+	if CAT_UNLIKELY(blake2b_update(&B, (const u8 *)EP, 64)) {
 		return -1;
 	}
-	if (blake2b_update(&B, (const u8 *)server_public_key, 64)) {
+	if CAT_UNLIKELY(blake2b_update(&B, (const u8 *)server_public_key, 64)) {
 		return -1;
 	}
-	if (blake2b_update(&B, (const u8 *)SN, 32)) {
+	if CAT_UNLIKELY(blake2b_update(&B, (const u8 *)SN, 32)) {
 		return -1;
 	}
-	if (blake2b_final(&B, (u8 *)H, 64)) {
+	if CAT_UNLIKELY(blake2b_final(&B, (u8 *)H, 64)) {
 		return -1;
 	}
 
@@ -186,7 +187,7 @@ int tabby_client_handshake(tabby_client *C, const char server_public_key[64], co
 	// this is no longer the case, so we should validate h != 0.
 
 	// Validate h != 0.
-	if (is_zero(h)) {
+	if CAT_UNLIKELY(is_zero(h)) {
 		return -1;
 	}
 
@@ -197,7 +198,7 @@ int tabby_client_handshake(tabby_client *C, const char server_public_key[64], co
 	// the snowshoe_simul function will validate its input in constant-time.
 
 	// T = CS * EP + d * SP
-	if (snowshoe_simul(state->private_key, EP, d, server_public_key, T)) {
+	if CAT_UNLIKELY(snowshoe_simul(state->private_key, EP, d, server_public_key, T)) {
 		return -1;
 	}
 
@@ -205,18 +206,18 @@ int tabby_client_handshake(tabby_client *C, const char server_public_key[64], co
 	// the session secret key k.
 
 	// k = BLAKE2(T, H)
-	if (blake2b_init(&B, 64)) {
+	if CAT_UNLIKELY(blake2b_init(&B, 64)) {
 		return -1;
 	}
-	if (blake2b_update(&B, (const u8 *)T, 128)) {
+	if CAT_UNLIKELY(blake2b_update(&B, (const u8 *)T, 128)) {
 		return -1;
 	}
-	if (blake2b_final(&B, (u8 *)k, 64)) {
+	if CAT_UNLIKELY(blake2b_final(&B, (u8 *)k, 64)) {
 		return -1;
 	}
 
 	// Verify the high 32 bytes of k matches PROOF
-	if (!is_equal(PROOF, k + 32)) {
+	if CAT_UNLIKELY(!is_equal(PROOF, k + 32)) {
 		return -1;
 	}
 

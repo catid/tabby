@@ -34,12 +34,13 @@ int tabby_sign(tabby_server *S, const void *message, int bytes, char signature[9
 	server_internal *state = (server_internal *)S;
 
 	// If library is not initialized,
-	if (!m_initialized) {
+	if CAT_UNLIKELY(!m_initialized) {
 		return -1;
 	}
 
 	// If input is invalid or server object is not initialized,
-	if (!state || !message || bytes <= 0 || !signature || state->flag != FLAG_INIT) {
+	if CAT_UNLIKELY(!state || !message || bytes <= 0 ||
+		!signature || state->flag != FLAG_INIT) {
 		return -1;
 	}
 
@@ -51,13 +52,13 @@ int tabby_sign(tabby_server *S, const void *message, int bytes, char signature[9
 
 	// r = BLAKE2(sign_key, M) mod q
 	char r[64];
-	if (blake2b_init_key(&B, 64, state->sign_key, 32)) {
+	if CAT_UNLIKELY(blake2b_init_key(&B, 64, state->sign_key, 32)) {
 		return -1;
 	}
-	if (blake2b_update(&B, (const u8 *)message, bytes)) {
+	if CAT_UNLIKELY(blake2b_update(&B, (const u8 *)message, bytes)) {
 		return -1;
 	}
-	if (blake2b_final(&B, (u8 *)r, 64)) {
+	if CAT_UNLIKELY(blake2b_final(&B, (u8 *)r, 64)) {
 		return -1;
 	}
 	snowshoe_mod_q(r, r);
@@ -69,7 +70,7 @@ int tabby_sign(tabby_server *S, const void *message, int bytes, char signature[9
 
 	// R = r*4*G
 	char *R = signature;
-	if (snowshoe_mul_gen(r, R, 1)) {
+	if CAT_UNLIKELY(snowshoe_mul_gen(r, R, 1)) {
 		return -1;
 	}
 
@@ -78,19 +79,19 @@ int tabby_sign(tabby_server *S, const void *message, int bytes, char signature[9
 
 	// t = BLAKE2(SP, R, M) mod q
 	char t[64];
-	if (blake2b_init(&B, 64)) {
+	if CAT_UNLIKELY(blake2b_init(&B, 64)) {
 		return -1;
 	}
-	if (blake2b_update(&B, (const u8 *)state->public_key, 64)) {
+	if CAT_UNLIKELY(blake2b_update(&B, (const u8 *)state->public_key, 64)) {
 		return -1;
 	}
-	if (blake2b_update(&B, (const u8 *)R, 64)) {
+	if CAT_UNLIKELY(blake2b_update(&B, (const u8 *)R, 64)) {
 		return -1;
 	}
-	if (blake2b_update(&B, (const u8 *)message, bytes)) {
+	if CAT_UNLIKELY(blake2b_update(&B, (const u8 *)message, bytes)) {
 		return -1;
 	}
-	if (blake2b_final(&B, (u8 *)t, 64)) {
+	if CAT_UNLIKELY(blake2b_final(&B, (u8 *)t, 64)) {
 		return -1;
 	}
 	snowshoe_mod_q(t, t);
@@ -111,12 +112,12 @@ int tabby_sign(tabby_server *S, const void *message, int bytes, char signature[9
 
 int tabby_verify(const void *message, int bytes, const char public_key[64], const char signature[96]) {
 	// If library is not initialized,
-	if (!m_initialized) {
+	if CAT_UNLIKELY(!m_initialized) {
 		return -1;
 	}
 
 	// If input is invalid,
-	if (!public_key || !message || bytes <= 0 || !signature) {
+	if CAT_UNLIKELY(!public_key || !message || bytes <= 0 || !signature) {
 		return -1;
 	}
 
@@ -140,7 +141,7 @@ int tabby_verify(const void *message, int bytes, const char public_key[64], cons
 	char u[64];
 	const char *s = signature + 64;
 	snowshoe_neg(public_key, u);
-	if (snowshoe_simul_gen(s, t, u, u)) {
+	if CAT_UNLIKELY(snowshoe_simul_gen(s, t, u, u)) {
 		return -1;
 	}
 
@@ -149,7 +150,7 @@ int tabby_verify(const void *message, int bytes, const char public_key[64], cons
 	const u64 *X = (const u64 *)u;
 	const u64 *Y = (const u64 *)R;
 	for (int ii = 0; ii < 8; ++ii) {
-		if (X[ii] != Y[ii]) {
+		if CAT_UNLIKELY(X[ii] != Y[ii]) {
 			return -1;
 		}
 	}

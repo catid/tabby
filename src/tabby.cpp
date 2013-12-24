@@ -145,7 +145,7 @@ int _tabby_init(int expected_version) {
 
 void tabby_erase(void *object, int bytes) {
 	// If input is valid,
-	if (object && bytes > 0) {
+	if CAT_LIKELY(object && bytes > 0) {
 		// Securely erase the input
 		cat_secure_erase(object, bytes);
 	}
