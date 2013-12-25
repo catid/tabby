@@ -221,9 +221,8 @@ case T would be the X=0 point, and an attacker could impersonate a server.  Or i
 EP may be chosen as a known multiple of SP.  The main defense against this attack is that
 finding a hash by trial-and-error such that H evenly divides q would take roughly q/2 attempts
 or ~2^251 attempts, and the attack has to be performed online since the client chooses a new
-nonce for each connection.  This is much harder than solving the ECDLP problem presented by
-Snowshoe, and it has the added disadvantage of needing to be performed online, so this is
-not a realistic attack.
+nonce for each connection.  This is much harder than solving Snowshoe's ECDLP, and it has the
+added disadvantage of needing to be performed online, so this is not a realistic attack.
 
 
 #### Credits
