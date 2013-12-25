@@ -18,6 +18,155 @@ secure random number generator library.  Please refer to those repositories for
 more information about the underlying math and software implementation.
 
 
+#### Usage
+
+The [header file](https://github.com/catid/tabby/blob/master/include/tabby.h)
+provides helpful usage information.
+
+##### Building: Mac
+
+To build the static library, install command-line Xcode tools and simply run the make script:
+
+~~~
+make test
+~~~
+
+This produces `libtabby.a` with optimizations, and it also runs the unit tester.
+
+##### Example Usage: EC-DH with Forward Secrecy
+
+Link to the Tabby static library `/bin/libtabby.a` (-ltabby)
+and include the `./include/tabby.h` header.
+
+Verify binary API compatibility on startup:
+
+~~~
+	if (tabby_init()) {
+		throw "Buildtime failure: Wrong tabby static library";
+	}
+~~~
+
+The server side will need to set up a `tabby_server` object, either by generating
+a new key pair, or by loading an existing one.  Most commonly the server will be
+loading an existing long-term key pair, since the clients that connect will need
+to know it ahead of time.
+
+To generate a new server long-term private/public key pair:
+
+~~~
+	tabby_server s;
+	char public_key[64];
+	char private_key[64];
+
+	// Generate a Tabby server object
+	if (tabby_server_gen(&s, 0, 0)) {
+		return false;
+	}
+
+	// Read the public key
+	if (tabby_server_get_public_key(&s, public_key)) {
+		return false;
+	}
+
+	// Read the private key
+	if (tabby_server_save_secret(&s, private_key)) {
+		return false;
+	}
+
+	// Write private key/public key to disk here
+
+	// Always erase sensitive information when done
+	tabby_erase(private_key, sizeof(private_key));
+	tabby_erase(&s, sizeof(s));
+~~~
+
+To reload a server private key:
+
+~~~
+	char private_key[64];
+	tabby_server s;
+
+	// Read private key from disk here
+
+	if (tabby_server_load_secret(&s, 0, 0, private_key)) {
+		return false;
+	}
+~~~
+
+Now the server is ready to handle connections.  To start a connection,
+the client side will need to create a `tabby_client` object.
+
+To create a Tabby client object:
+
+~~~
+	tabby_client c;
+	char client_request[96];
+
+	if (tabby_client_gen(&c, 0, 0, client_request)) {
+		return false;
+	}
+~~~
+
+This generates the 96 byte `client_request` message that is sent to the server.
+
+To process the client's request on the server:
+
+~~~
+	char server_response[128];
+	char server_secret_key[32];
+
+	if (tabby_server_handshake(&s, client_request, server_response, server_secret_key)) {
+		// Ignore client request message
+		return false;
+	}
+~~~
+
+The server will either reject the request if the function returns non-zero, or the server
+will respond with a 128 byte `server_response` message to the client and fill the
+`server_secret_key` with the session key shared with the client.
+
+If the client never receives the server's response, it may retry.  So a UDP server should
+be able to retransmit the response rather than creating a second connection.
+
+When the client eventually receives the response, it can validate the response and also
+calculate the same secret key:
+
+~~~
+	char client_secret_key[32];
+
+	if (tabby_client_handshake(&c, public_key, server_response, client_secret_key)) {
+		// Ignore server response message
+		return false;
+	}
+~~~
+
+The client will either reject the response if the function returns non-zero, or the client
+will have established a 32 byte secret key shared with the server.  This can be used to
+set up authenticated encryption with e.g. [Calico](https://github.com/catid/calico).
+
+Periodically the server should rekey.  After each rekeying, all connections made with the
+previous key will be protected in the event that the server is compromised and its long-
+term secret key is divulged.
+
+To rekey the server, the rekey function should be run from a separate thread periodically:
+
+~~~
+	int my_thread_func(tabby_server *s) {
+		// Every 30 seconds or until terminated,
+		while (my_wait(30000)) {
+			// Rekey the server
+			tabby_server_rekey(s, 0, 0); // safe to ignore failures
+		}
+	}
+~~~
+
+##### Example Usage: Signatures
+
+The signature API is described in full in the [header file](https://github.com/catid/tabby/blob/master/include/tabby.h).
+
+And there is also an example of signatures in the [unit tester](https://github.com/catid/tabby/blob/master/tests/tabby_test.cpp).
+
+
 #### Benchmarks
 
 The following measurements show normal walltime with Turbo Boost on, and median
@@ -167,6 +316,11 @@ Server online processing:
 A client is able to provide invalid CP of order 4q.  The private point T is
 multiplied by 4, which prevents this potential subgroup attack.  Other invalid
 points such as X=0 or points not on the curve are rejected up front.
+
+The server generates a new ephemeral key periodically, which is effectively added
+to the secret point T.  This provides forward secrecy in that once the ephemeral
+key is erased, a server compromise will not allow the secret session key k for
+old sessions to be discovered.
 
 The server generates a new SN for each connection, which defeats any attempts to
 replay a previous client request to create a new connection with the same key, and
