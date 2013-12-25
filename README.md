@@ -118,7 +118,7 @@ Client online processing:
 At this end of this protocol, both parties now have a shared 256-bit secret key
 and the server has been authenticated by the client.
 
-#### Discussion of Performance
+#### Performance Discussion
 
 Not only is Tabby optimally short (one round), it also is exceptionally efficient.
 
@@ -139,46 +139,93 @@ server response.  Snowshoe is the only library available online that provides
 the capability to do it at this time.  In practice this takes about 1.5x the
 time of the server's EC-DH operation.
 
-So overall the client has to do about 2x the processing of the server.
+So overall the client has to do about 2x the online processing of the server.
 
-#### Comparison to Signcryption
+#### Protocol Rationale
 
-Signcryption would have the server sign an ephemeral key periodically, which
-would require two key generations.  This is twice the work required for Tabby,
-though it is not in a critical path.
+Since the client does not need to authenticate itself during the protocol,
+it is easier to implement and simpler to analyze than e.g. FHMQV.
 
-When the server handles a connection, it only has to do normal EC-DH, which is
-the same as Tabby's cost also.  So in general signcryption has about the same
-cost as Tabby for the server side.
+The client generates a new CP and CN for each connection, which makes the
+public information hash H of CP, CN, EP, SP, and SN difficult to control by
+a MitM or malicious server.
 
-The client still needs to generate a public key, so that cost is the same as
-Tabby.
+Since the client generates a new key for each session, forward secrecy is not
+dependent on a client long-term key.
 
-When the client receives the signcryption ephemeral key and the signature, it
-has to verify the signature and then perform EC-DH on the ephemeral key.
-Verifying a signature takes roughly 1.2x an EC-DH operation.  So overall the
-client has to perform 2.7x EC-DH operations for signcryption with similar small
-operations, so it is 35% less efficient.
+All operations involving secret information (keys, points, etc) are performed
+in constant-time.  This prevents leaking the information through a timing
+side-channel.  However Tabby is still vulnerable to SPA attacks.
 
-The other place where signcryption is worse is in security properties.  Tabby
-only shares two random numbers (CN, SN) and two public keys (CP, EP) in the
-clear.  Signcryption shares a linear combination of all the secret keys in the
-clear in order to produce a signature.  This scary process has been subject to
-attack when implementation flaws exist.  The "attack surface" of Tabby is thus
-much smaller.
+Client sends to server:
 
-There is also the issue of ephemeral key lifetime.  Once a signature is made it
-can be verified forever, unless a timestamp is attached.  This means any attacker
-can pretend to be the server if he knows the private key for any ephemeral key.
-On the other hand, handshakes with Tabby are tied to the long-term private key
-of the server in addition to the ephemeral key, so this type of impersonation
-attack is impossible.
++ Client public key (CP) : 64 bytes.
++ Client nonce (CN) : 32 bytes.
 
-#### TODO
+Server online processing:
 
-+ References
-+ Read through code again and look for bugs
-+ Analyze the protocol to make sure it is solid
+A client is able to provide invalid CP of order 4q.  The private point T is
+multiplied by 4, which prevents this potential subgroup attack.  Other invalid
+points such as X=0 or points not on the curve are rejected up front.
+
+The server generates a new SN for each connection, which defeats any attempts to
+replay a previous client request to create a new connection with the same key, and
+also prevents a malicious client from controlling the value of H.
+
+The 512-bit public information hash H is reduced modulo q, which makes the result
+uniformly distributed over 0..q-1.  And its exceptional value 0 is avoided by
+generating a new SN.
+
+The expression `e = SS * h + ES (mod q)` is widely considered safe to share, as
+it is the same one used for Schnorr signatures.  Since SS, h, and ES are all
+values uniformly distributed in 1..q-1, the result is similarly uniformly
+distributed.
+
+The value of `e` is further protected by using it as the secret scalar for the
+private point T.  The client does not have a way to reproduce `e` either, so this
+is not an avenue for attack.  The value 0 is rejected during generation.
+
+The session secret key k is generated from the private point T as well as the public
+information hash H, to ensure that the public parameters are all fully incorporated
+into the key.  This prevents any hypothetical attack that may rely on the group order
+of point T to alias two values of SN to the same k.
+
+The final step takes the high 32 bytes of k as the server's PROOF and uses the
+low 32 bytes of k as the session secret key, which does not lead to any key
+leakage since the BLAKE2 hash function is strong.
+
+Server sends to client:
+
++ Server ephemeral public key (EP) : 64 bytes.
++ Server nonce (SN) : 32 bytes.
++ Server proof (PROOF) : 32 bytes.
+
+Client online processing:
+
+A server is able to provide invalid SP or EP of order 4q.  The private point T is
+multiplied by 4, which prevents this potential subgroup attack.  The server may also
+provide SP = EP, which must be considered.  Other invalid points such as X=0 or points
+not on the curve are rejected up front.
+
+The client validates that the server's SN produces an h that is nonzero, which prevents
+the session secret from relying exclusively on the ephemeral keys.
+
+From the client's perspective, the secret point T is just the sum of two secret points,
+`CS * EP`, and `h*CS * SP`.  For speed they are calculated simultaneously.  The server
+has no control over CS and little control over h, while the client has no control over
+EP nor h.
+
+If `SP = EP`, the resulting `T = (1+h)*CS * SP`. The multiplication by `1+h` is problematic
+if `h = q-1`, which may be possible since the server has control over the value H.  In this
+case T would be the X=0 point, and an attacker could impersonate a server.  The main defense
+against this attack is that finding a hash by trial-and-error such that H evenly divides q
+would take roughly q/2 attempts or ~2^251 attempts, and the attack has to be performed online
+since the client chooses a new nonce for each connection.  This is much harder than solving
+the ECDLP problem presented by Snowshoe, and it has the added disadvantage of needing to be
+performed online, so this is not a realistic attack.
+
+Another hypothetical attack such that EP is chosen to be some multiple of SP is also not
+viable, since finding a hash H congruent to any value less than q is as hard as q-1.
 
 
 #### Credits
