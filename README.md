@@ -217,15 +217,13 @@ EP nor h.
 
 If `SP = EP`, the resulting `T = (1+h)*CS * SP`. The multiplication by `1+h` is problematic
 if `h = q-1`, which may be possible since the server has control over the value H.  In this
-case T would be the X=0 point, and an attacker could impersonate a server.  The main defense
-against this attack is that finding a hash by trial-and-error such that H evenly divides q
-would take roughly q/2 attempts or ~2^251 attempts, and the attack has to be performed online
-since the client chooses a new nonce for each connection.  This is much harder than solving
-the ECDLP problem presented by Snowshoe, and it has the added disadvantage of needing to be
-performed online, so this is not a realistic attack.
-
-Another hypothetical attack such that EP is chosen to be some multiple of SP is also not
-viable, since finding a hash H congruent to any value less than q is as hard as q-1.
+case T would be the X=0 point, and an attacker could impersonate a server.  Or in general
+EP may be chosen as a known multiple of SP.  The main defense against this attack is that
+finding a hash by trial-and-error such that H evenly divides q would take roughly q/2 attempts
+or ~2^251 attempts, and the attack has to be performed online since the client chooses a new
+nonce for each connection.  This is much harder than solving the ECDLP problem presented by
+Snowshoe, and it has the added disadvantage of needing to be performed online, so this is
+not a realistic attack.
 
 
 #### Credits
