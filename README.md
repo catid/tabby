@@ -191,10 +191,10 @@ One-round EC-DH with forward secrecy:
 + Tabby server handshake: `143984` median cycles, `53.8635` avg usec (`18565` connections/second)
 + Tabby client handshake: `206192` median cycles, `77.11` avg usec
 
-Each of these operations takes roughly 2.5 usec longer than the Snowshoe math
-routines they are based on.  Where applicable, these operations do full input
-validation, use good random number sources, run in constant time, and clean
-up the stack to avoid leaking sensitive information.
+Each of these operations takes roughly 2.5 usec (<5% overhead) longer than the
+Snowshoe math routines they are based on.  Where applicable, these operations
+do full input validation, use good random number sources, run in constant time,
+and clean up the stack to avoid leaking sensitive information.
 
 In general these results are the best for any public domain library at this time.
 
