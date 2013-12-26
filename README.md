@@ -196,6 +196,8 @@ routines they are based on.  Where applicable, these operations do full input
 validation, use good random number sources, run in constant time, and clean
 up the stack to avoid leaking sensitive information.
 
+In general these results are the best for any public domain library at this time.
+
 
 #### Tabby Key Generation Process : Algorithm 1
 
