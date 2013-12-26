@@ -4,7 +4,7 @@
 The Tabby key agreement protocol is designed for the situation where a client
 is attempting to connect to a server it has not connected to before.  After the
 protocol completes, a 256-bit secret key is shared by both parties.  The server
-has also been authenticated by the client.  Weak "forward secrecy" is provided,
+has also been authenticated by the client.  Perfect forward secrecy is provided,
 in that after the server changes its ephemeral key, all previous connections
 cannot be decrypted if the server's long-term secret key is leaked somehow.
 It is a one-round protocol that runs faster than signcryption-based approaches,
@@ -310,8 +310,8 @@ dependent on a client long-term key.
 
 All operations involving secret information (keys, points, etc) are performed
 in constant-time with regular execution and memory access patterns.  This
-prevents leaking the information through a time or
-[cache](https://eprint.iacr.org/2013/448.pdf) side-channel.
+prevents leaking the information through an execution time or cache access time
+side-channel [4].
 
 However Tabby is still vulnerable to SPA attacks, since Snowshoe does not
 have protection against SPA attacks in constructing its mask for table lookup.
@@ -400,6 +400,137 @@ the public information hash H, this proves that:
 
 + (1) the server's transmitted information came from the real server and
 + (2) that this specific client's request is the one that the real server responded to.
+
+
+#### Security Claims
+
+Tabby has a few unusually nice security properties that are enumerated here.
+
+The goal of the Tabby protocol is to perform an EC-DH key agreement, provide perfect
+forward secrecy, authenticate the server, be robust to KCI attacks, and provide
+deniability for the client at a "128-bit" security level.
+
+I make no attempt to achieve "provable security" here.  These are merely claims of security
+with rough proofs.  It's way out of my depth since I am not an academic anymore.  Instead
+I claim practical security against realistic attacks against Tabby specifically with the
+Snowshoe group math.
+
+##### "128-bit" Security Level
+
+The idea of using a number of bits to refer to the level of security offered by a
+cryptosystem is a little unrealistic as described in [2].  However the work required to
+break Tabby in any sense should be the same as brute-forcing a 256-bit hash, which would
+take roughly 2^128 trials on average.  This is where "128 bits" comes from.
+
+In truth Tabby provides more like "126 bits" of security, since the Snowshoe library uses
+a 252-bit group order.  All the other design choices are at a "128 bit" security level.
+
+##### Resilience to Key Compromise Impersonation
+
+KCI (Key Compromise Impersonation) attacks are passive attacks where the server's long-term
+secret key SS has been compromised.  With the knowledge of SS it is possible for an active
+MitM attack against new connections.  However, KCI refers to passive attacks where the
+attacker only observes the new connections.
+
+In this case Tabby has resilience to KCI, because the server picks an ephemeral key pair
+and uses it intimately in the derivation of the session key.  Since a passive attacker
+has no access to this ephemeral secret, the sessions are still secure.  The detailed
+reasoning is similar to [1].
+
+##### Deniability
+
+Deniability [3] refers to the ability for a client to deny that it sent a message.  This
+is a little out of the scope of handshakes, but can be an issue if the handshake includes
+authentication of the client.  Since Tabby leaves out client authentication, and expects
+it to be performed in the secrecy of the secure tunnel established after the handshake,
+the Tabby handshake possesses the Deniability property for the client.
+
+##### Perfect Forward Secrecy
+
+PFS (Perfect Forward Secrecy), analyzed in depth in [1] for this sort of protocol, is
+the property that after a long-term secret key SS is compromised, previous sessions with
+the server cannot be decrypted.  This actually follows from KCI protection.  Since passive
+attackers cannot decrypt a live session, previous sessions can definitely not be decrypted
+since they are in the past and can only be passively recorded.
+
+HMQV, for comparison, does not achieve PFS as described in [1] and [3].  Tabby, however,
+does not authenticate the client and so there is no long-term reveal of the client's CS
+that leads to any meaningful compromise.  Each time the client connects it uses a new CS,
+so learning this key after the fact only allows that one session to be decrypted, which
+is also true if all of the server's SS and ES are revealed for a session.  In theory the
+client erases its secret key after each connection, so revealing CS is impossible, and
+similarly the server erases its ES periodically, so revealing it is also impossible.
+
+##### Small Attack Surface
+
+Tabby is a library that has only the goal of providing Tabby-style signatures and handshakes
+and uses Cymric and Snowshoe to achieve this purposes.  The software is as small and easy
+to audit as it can be.  Furthermore, the math is fairly simple and easy to understand,
+and all of the design choices support a robust and fail-safe design with full input validation
+and error checking and a simple design that is hard to mess up as a user of the library.
+
+In terms of protocol attack surface, the public information consists of CP, CN, SP, SP, and EP.
+These are all either 256-bit random numbers or opaque public keys.  For comparison, a
+signcryption approach like [NaCL](http://nacl.cr.yp.to/) requires each message to include a
+scary linear permutation of the long-term server secret key in the clear.  Ed25519 supposedly
+prevents attacks through this parameter, but [the paper](http://ed25519.cr.yp.to/ed25519-20110926.pdf)
+does admit this has been an avenue for attack in the past.  Tabby handshakes avoid this issue
+entirely.
+
+##### Resilience to Unknown Key Share
+
+UKS (Unknown Key Share) attacks involve successfully validating the PROOF of the protocol
+without knowing the long-term secret key of the server.  I claim that these are not possible.
+
+This could be exploited if a MitM somehow managed to set the shared private key T to the
+identity element by manipulating the server response.  However as discussed in an earlier
+section the T.X = 0 condition is rejected on the client side on top of other protections,
+which ensures that the server's SS is involved in every handshake.
+
+This leads into replay protection in that previous session public information cannot be
+used to forge a new connection since, especially, the client nonce changes each time, and
+so the server's PROOF would be rejected by the client if a replay were attempted, which
+would be another form of UKS attack.
+
+##### Replay Protection
+
+Tabby uses ephemeral nonces for each new connection on both ends of the handshake, which
+makes it resilient to replay attacks.  The client will be able to detect if the server's
+response is replayed because the PROOF will not match for the new CN.
+
+Another interesting comparison is with signcryption approaches that use a signature to
+tie an ephemeral key to the long-term secret key of the server.  These approaches add
+a potential vulnerability in that if an ephemeral secret key is ever compromised, it is
+signed forever and can be used to impersonate the server.  Tabby does not have this
+complication since all handshakes are tied to ephemeral parameters.
+
+##### Side-Channel Attack Protection
+
+Practical side-channel attacks are a real issue these days [4] especially for cloud servers
+where multiple server applications from different users are running on the same physical box.
+Snowshoe uses regular execution and memory access patterns and is small so it fits in L1 cache
+(which is a second layer of protection) so it is fully protected against even cache-timing
+attacks.  Tabby furthermore does all operations in constant time where possible.
+
+Another side-channel is memory usage.  Tabby and Snowshoe both attempt to wipe secret data
+from the stack to avoid it leaking out.  And no dynamic memory allocation is performed by
+either library, which makes memory-related security leaks harder to occur.  Buffer reuse
+and other tricks are employed to achieve memory security with a minimal impact on speed.
+
+
+### References
+
+##### [1] ["HMQV: A High-Performance Secure Diffie-Hellman Protocol" (Krawczyk 2005)](http://eprint.iacr.org/2005/176.pdf)
+Excellent analysis of one-round protocols similar to Tabby.
+
+##### [2] ["Non-uniform cracks in the concrete" (Bernstein 2013)](http://cr.yp.to/nonuniform/nonuniform-20130914.pdf)
+History and discussion of "actual security."
+
+##### [3] ["Exchanging a key - how hard can it be?" (Cremers Feltz 2009)](http://www.isg.rhul.ac.uk/dusko/seminar/slides/111109-CremersC.pdf)
+Nice introduction to what key exchange protocols are all about.
+
+##### [4] ["Flush+Reload: a High Resolution, Low Noise, L3 Cache Side-Channel Attack" (Yarom Falkner 2013)](https://eprint.iacr.org/2013/448.pdf)
+Modern side-channel attack discussion.
 
 
 #### Credits
