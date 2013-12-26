@@ -468,7 +468,7 @@ Tabby is a library that has only the goal of providing Tabby-style signatures an
 and uses Cymric and Snowshoe to achieve this purpose.  The software is as small and easy
 to audit as it can be.  Furthermore, the math is fairly simple and easy to understand,
 and all of the design choices support a robust and fail-safe design with full input validation
-and error checking and a simple design that is hard to mess up as a user of the library.
+and error checking, with a simple API that is hard to mess up as a user of the library.
 
 In terms of protocol attack surface, the public information consists of CP, CN, SP, SP, and EP.
 These are all either 256-bit random numbers or opaque public keys.  For comparison, a
