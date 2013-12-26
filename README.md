@@ -262,6 +262,7 @@ Client online processing:
 + d = h * CS (mod q) with Snowshoe.
 + Validate in constant-time that d != 0.
 + T'(X,Y) = CS * EP + d * SP with Snowshoe.
++ Validate in constant-time that T.X != 0.
 + k' = BLAKE2(H, T') : 64 bytes.
 + Session key is the low 32 bytes of k'.
 + Verify the high 32 bytes of k' matches PROOF.
