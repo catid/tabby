@@ -465,7 +465,7 @@ similarly the server erases its ES periodically, so revealing it is also impossi
 ##### Small Attack Surface
 
 Tabby is a library that has only the goal of providing Tabby-style signatures and handshakes
-and uses Cymric and Snowshoe to achieve this purposes.  The software is as small and easy
+and uses Cymric and Snowshoe to achieve this purpose.  The software is as small and easy
 to audit as it can be.  Furthermore, the math is fairly simple and easy to understand,
 and all of the design choices support a robust and fail-safe design with full input validation
 and error checking and a simple design that is hard to mess up as a user of the library.
