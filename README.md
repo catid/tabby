@@ -293,7 +293,11 @@ So overall the client has to do about 2x the online processing of the server.
 #### Protocol Rationale
 
 Since the client does not need to authenticate itself during the protocol,
-it is easier to implement and simpler to analyze than e.g. FHMQV.
+it is easier to implement and simpler to analyze than e.g. FHMQV.  As a result
+Tabby also offers deniability, in that no client authentication is performed in
+the clear (nor at all): All of the client's public information is randomly
+generated for each new connection.  So there is nothing to indicate WHICH client
+is making the request in reality.
 
 The client generates a new CP and CN for each connection, which makes the
 public information hash H of CP, CN, EP, SP, and SN difficult to control by
@@ -379,6 +383,19 @@ finding a hash by trial-and-error such that H evenly divides q would take roughl
 or ~2^251 attempts, and the attack has to be performed online since the client chooses a new
 nonce for each connection.  This is much harder than solving Snowshoe's ECDLP, and it has the
 added disadvantage of needing to be performed online, so this is not a realistic attack.
+
+As further protection against this sort of attack, T.X is verified in constant-time to be
+non-zero, which should not be possible since the server cannot arrive at this value.  Any of
+the remaining points would involve the client's value of CS and would require a malicious
+server to actually know its private key to generate a valid PROOF.
+
+The client finally verifies that the server's PROOF matches.  This proves that the server
+possesses its long-term private key and the client just established a connection with the
+real server.  Since all of the public information has been rolled into the PROOF through
+the public information hash H, this proves that:
+
++ (1) the server's transmitted information came from the real server and
++ (2) that this specific client's request is the one that the real server responded to.
 
 
 #### Credits

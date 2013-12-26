@@ -201,6 +201,21 @@ int tabby_client_handshake(tabby_client *C, const char server_public_key[64], co
 		return -1;
 	}
 
+	// Note that the server will never arrive at T.X = 0, though a malicious
+	// server could make this happen on the client side with a lot of luck.
+	// This is because the server calculates e * CP, where 0 < e < q.  And
+	// the result of that operation should never be the identity element.
+
+	// Validate that T.X != 0 in constant-time.
+	// Note that internally Snowshoe uses the first 32 bytes of T to store
+	// the X coordinate, and just flips the byte order.  If T.X is zero then
+	// all of the first 32 bytes are 0.  ~0 also evaluates to 0 sometimes in
+	// Snowshoe, but this aliasing is removed when Snowshoe converts points
+	// to affine so it will not happen here.
+	if (is_zero(T)) {
+		return -1;
+	}
+
 	// Hash the secret point T with the public information H to arrive at
 	// the session secret key k.
 
