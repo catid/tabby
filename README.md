@@ -511,11 +511,11 @@ Practical side-channel attacks are a real issue these days [4] especially for cl
 where multiple server applications from different users are running on the same physical box.
 Snowshoe uses regular execution and memory access patterns and is small so it fits in L1 cache
 (which is a second layer of protection) so it is fully protected against even cache-timing
-attacks.  Tabby furthermore does all operations in constant time where possible.
+attacks.  Tabby furthermore does all operations in constant time where necessary.
 
-Another side-channel is memory usage.  Tabby and Snowshoe both attempt to wipe secret data
-from the stack to avoid it leaking out.  And no dynamic memory allocation is performed by
-either library, which makes memory-related security leaks harder to occur.  Buffer reuse
+Another side-channel is memory usage.  Tabby, Snowshoe, and Cymric all attempt to wipe secret
+data from the stack to avoid it leaking out.  And no dynamic memory allocation is performed
+by these libraries, which makes memory-related security leaks less likely.  Buffer reuse
 and other tricks are employed to achieve memory security with a minimal impact on speed.
 
 
