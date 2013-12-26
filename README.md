@@ -303,8 +303,10 @@ Since the client generates a new key for each session, forward secrecy is not
 dependent on a client long-term key.
 
 All operations involving secret information (keys, points, etc) are performed
-in constant-time.  This prevents leaking the information through a timing
-side-channel.  However Tabby is still vulnerable to SPA attacks.
+in constant-time.  This prevents leaking the information through a time or
+[cache](https://eprint.iacr.org/2013/448.pdf) side-channel.
+However Tabby is still vulnerable to SPA attacks, since Snowshoe does not
+have protection against SPA attacks in constructing its mask for table lookup.
 
 Client sends to server:
 
