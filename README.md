@@ -472,7 +472,7 @@ and error checking, with a simple API that is hard to mess up as a user of the l
 
 In terms of protocol attack surface, the public information consists of CP, CN, SP, SN, and EP.
 These are all either 256-bit random numbers or opaque public keys.  For comparison, a
-signcryption approach like [NaCL](http://nacl.cr.yp.to/) requires each message to include a
+signcryption approach like [NaCl](http://nacl.cr.yp.to/) requires each message to include a
 scary linear permutation of the long-term server secret key in the clear.  Ed25519 supposedly
 prevents attacks through this parameter, but [the paper](http://ed25519.cr.yp.to/ed25519-20110926.pdf)
 does admit this has been an avenue for attack in the past.  Tabby handshakes avoid this issue
