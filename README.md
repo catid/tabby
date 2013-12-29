@@ -17,6 +17,10 @@ math library, and it also uses the [Cymric](https://github.com/catid/cymric/)
 secure random number generator library.  Please refer to those repositories for
 more information about the underlying math and software implementation.
 
+Tabby does not do data encryption.  To use the 256-bit key provided by Tabby to
+encrypt messages for transmission over TCP/UDP sockets,
+see the [Calico project](https://github.com/catid/calico/).
+
 
 #### Usage
 
