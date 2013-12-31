@@ -22,12 +22,7 @@ encrypt messages for transmission over TCP/UDP sockets,
 see the [Calico project](https://github.com/catid/calico/).
 
 
-#### Usage
-
-The [header file](https://github.com/catid/tabby/blob/master/include/tabby.h)
-provides helpful usage information.
-
-##### Building: Mac
+##### Building: Mac/Linux
 
 To build the static library, install command-line Xcode tools and simply run the make script:
 
@@ -36,6 +31,30 @@ make test
 ~~~
 
 This produces `libtabby.a` with optimizations, and it also runs the unit tester.
+
+##### Building: Windows
+
+You can link to the 64-bit `bin/libtabby.lib` static library and include
+`include/tabby.h` to use Tabby from an e.g. Visual Studio project.
+There is an example test project under `msvc2010/` that demonstrates using
+Tabby from a Visual Studio project.
+
+The following instructions allow you to reproduce the `bin/libtabby.lib` binary:
+
+Download LLVM from [http://llvm.org/builds/](http://llvm.org/builds/) for Windows to C:\LLVM\.
+Download Mingw64 from [http://mingw-w64.sourceforge.net/](http://mingw-w64.sourceforge.net/) for Windows 64-bit to C:\mingw64\.
+
+~~~
+copy Makefile.Mingw64 Makefile
+c:\mingw64\bin\mingw32-make.exe release
+~~~
+
+This produces `bin/libtabby.lib`, which can be linked to an MSVC2010 build.
+
+#### Usage
+
+The [header file](https://github.com/catid/tabby/blob/master/include/tabby.h)
+provides an API reference.
 
 ##### Example Usage: EC-DH with Forward Secrecy
 
