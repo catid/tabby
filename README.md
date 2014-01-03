@@ -196,23 +196,25 @@ The following measurements show normal walltime with Turbo Boost on, and median
 cycles with Turbo Boost off.  The measurements were taken over 10,000 samples
 for each configuration, unless otherwise noted.
 
-##### libtabby.a on Macbook Air (1.7 GHz Core i5-2557M Sandy Bridge, July 2011):
+##### libsnowshoe.a on iMac (2.7 GHz Core i5-2500S Sandy Bridge, June 2011):
+
+RDTSC instruction runs at 2.69393 GHz so no correction factor is needed.
 
 Key generation:
 
-+ Successfully created a new server key in `347400` cycles, `167` usec (one sample)
-+ Generated a client key in `176308` cycles, `79` usec (one sample)
-+ Periodic server rekey in `178284` cycles, `72` usec (one sample)
++ Successfully created a new server key in `401064` cycles, `163` usec (one sample)
++ Generated a client key in `183808` cycles, `65` usec (one sample)
++ Periodic server rekey in `187060` cycles, `52` usec (one sample)
 
 Signatures:
 
-+ Tabby sign: `69544` median cycles, `26.0792` avg usec
-+ Tabby verify signature: `161296` median cycles, `60.1556` avg usec
++ Tabby sign: `67700` median cycles, `18.5844` avg usec
++ Tabby verify signature: `154192` median cycles, `42.4291` avg usec
 
 One-round EC-DH with forward secrecy:
 
-+ Tabby server handshake: `143984` median cycles, `53.8635` avg usec (`18565` connections/second)
-+ Tabby client handshake: `206192` median cycles, `77.11` avg usec
++ Tabby server handshake: `137436` median cycles, `37.7628` avg usec (`26481` connections/second)
++ Tabby client handshake: `196036` median cycles, `53.7555` avg usec
 
 Each of these operations takes roughly 2.5 usec (<5% overhead) longer than the
 Snowshoe math routines they are based on.  Where applicable, these operations
