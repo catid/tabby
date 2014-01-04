@@ -196,6 +196,40 @@ The following measurements show normal walltime with Turbo Boost on, and median
 cycles with Turbo Boost off.  The measurements were taken over 10,000 samples
 for each configuration, unless otherwise noted.
 
+##### libsnowshoe.a on iMac-Tron (2.4 GHz Core i5-4258U Haswell, June 2013):
+
+RDTSC instruction runs at 2.4 GHz so no correction factor is needed.
+
+Key generation:
+
++ Successfully created a new server key in `375232` cycles, `140` usec (one sample)
++ Generated a client key in `209076` cycles, `67` usec (one sample)
++ Periodic server rekey in `170616` cycles, `60` usec (one sample)
+
+Signatures:
+
++ Tabby sign: `57136` median cycles, `20.0255` avg usec
++ Tabby verify signature: `134232` median cycles, `46.9197` avg usec
+
+One-round EC-DH with forward secrecy:
+
++ Tabby server handshake: `117424` median cycles, `40.6725` avg usec (`24586` connections/second)
++ Tabby client handshake: `169804` median cycles, `58.7846` avg usec
+
+These Haswell results are directly comparable to the latest SUPERCOP benchmarks
+in some cases, indicating Tabby takes:
+
++ 72.3% the time of Curve25519 to compute the server's shared secret for EC-DHE.
++ Just 6% slower than kumfp127g, the current speed leader on the charts for EC-DH.
+
++ 83% the time of Ed25519 to sign a message.
++ 261x faster than ronald3072 (RSA at the same security level) to sign a message.
+
++ 65% the time of Ed25519 to verify a message signature.
++ Just 8% slower than ronald3072 (RSA at the same security level) to verify signatures.
+
+SUPERCOP submissions for Tabby are in the works.
+
 ##### libsnowshoe.a on iMac (2.7 GHz Core i5-2500S Sandy Bridge, June 2011):
 
 RDTSC instruction runs at 2.69393 GHz so no correction factor is needed.
