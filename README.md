@@ -7,8 +7,8 @@ protocol completes, a 256-bit secret key is shared by both parties.  The server
 has also been authenticated by the client.  Perfect forward secrecy is provided,
 in that after the server changes its ephemeral key, all previous connections
 cannot be decrypted if the server's long-term secret key is leaked somehow.
-It is a one-round protocol that runs faster than signcryption-based approaches,
-while exposing less sensitive information.  Tabby has a "128-bit" security level.
+It is a one-round protocol that executes twice as fast as crypto_box-style
+approaches on the server side.  Tabby has a "128-bit" security level.
 
 Tabby also provides signatures based on the efficient EdDSA approach.
 
@@ -530,12 +530,7 @@ and all of the design choices support a robust and fail-safe design with full in
 and error checking, with a simple API that is hard to mess up as a user of the library.
 
 In terms of protocol attack surface, the public information consists of CP, CN, SP, SN, and EP.
-These are all either 256-bit random numbers or opaque public keys.  For comparison, a
-signcryption approach like [NaCl](http://nacl.cr.yp.to/) requires each message to include a
-scary linear permutation of the long-term server secret key in the clear.  Ed25519 supposedly
-prevents attacks through this parameter, but [the paper](http://ed25519.cr.yp.to/ed25519-20110926.pdf)
-does admit this has been an avenue for attack in the past.  Tabby handshakes avoid this issue
-entirely.
+These are all either 256-bit random numbers or opaque public keys.
 
 ##### Resilience to Unknown Key Share
 
@@ -557,12 +552,6 @@ would be another form of UKS attack.
 Tabby uses ephemeral nonces for each new connection on both ends of the handshake, which
 makes it resilient to replay attacks.  The client will be able to detect if the server's
 response is replayed because the PROOF will not match for the new CN.
-
-Another interesting comparison is with signcryption approaches that use a signature to
-tie an ephemeral key to the long-term secret key of the server.  These approaches add
-a potential vulnerability in that if an ephemeral secret key is ever compromised, it is
-signed forever and can be used to impersonate the server.  Tabby does not have this
-complication since all handshakes are tied to ephemeral parameters.
 
 ##### Side-Channel Attack Protection
 
