@@ -7,7 +7,7 @@ protocol completes, a 256-bit secret key is shared by both parties.  The server
 has also been authenticated by the client.  Perfect forward secrecy is provided,
 in that after the server changes its ephemeral key, all previous connections
 cannot be decrypted if the server's long-term secret key is leaked somehow.
-It is a one-round protocol that executes twice as fast as crypto_box-style
+It is a one-round protocol that executes twice as fast as crypto_box EC-DHE
 approaches on the server side.  Tabby has a "128-bit" security level.
 
 Tabby also provides signatures based on the efficient EdDSA approach.
@@ -339,6 +339,12 @@ The server only periodically needs to generate new keys, so the cost of running
 the protocol for the server is just one EC-DH operation `e*SP` for each
 connection.  Generating nonces and other operations account for less than 5%
 overhead on the EC-DH operation.
+
+To get perfect forward secrecy using NaCL's `crypto_box`, an ephemeral public
+key would need to be securely delivered to the client, requiring one EC-DH
+operation on each side.  And then the ephemeral public key would need to be used
+in a second EC-DH operation to arrive at the session key.  So this type of
+scheme is twice as slow as Tabby, which only requires one on the server.
 
 ##### Client Cost of Tabby
 
