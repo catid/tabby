@@ -105,6 +105,7 @@ static int generate_key(cymric_rng *rng, char private_key[32], char public_key[6
 #include "server.inc"
 #include "client.inc"
 #include "sign.inc"
+#include "passwords.inc"
 
 #ifdef __cplusplus
 extern "C" {
