@@ -18,7 +18,7 @@ LIBS = -lsnowshoe -lcymric
 
 shared_test_o = Clock.o
 
-tabby_o = tabby.o blake2b.o SecureErase.o
+tabby_o = tabby.o blake2b.o SecureErase.o SecureEqual.o
 
 tabby_test_o = tabby_test.o $(shared_test_o)
 
@@ -68,6 +68,9 @@ Clock.o : libcat/Clock.cpp
 SecureErase.o : libcat/SecureErase.cpp
 	$(CCPP) $(CFLAGS) -c libcat/SecureErase.cpp
 
+SecureEqual.o : libcat/SecureEqual.cpp
+	$(CCPP) $(CFLAGS) -c libcat/SecureEqual.cpp
+
 
 # Library objects
 
@@ -76,6 +79,12 @@ tabby.o : src/tabby.cpp
 
 blake2b.o : blake2/sse/blake2b.c
 	$(CC) $(CFLAGS) -c blake2/sse/blake2b.c
+
+lyra.o : lyra/lyra.c
+	$(CC) $(CFLAGS) -c lyra/lyra.c
+
+sponge.o : lyra/sponge.c
+	$(CC) $(CFLAGS) -c lyra/sponge.c
 
 
 # Executable objects

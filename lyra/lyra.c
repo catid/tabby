@@ -14,26 +14,6 @@
 /**
  Executes Lyra based on the G function from Blake 2.
 
- Number of columns set to 64.
-
- Inputs:
- 	 in - user password
- 	 inlen - password size
- 	 salt - salt
- 	 saltlen - salt size
- 	 t_cost - parameter to determine the processing time
- 	 m_cost - number or rows of the inner matrix, determining the memory cost.
- 	 outlen - derived key length
- Output:
- 	 out - derived key
- */
-int PHS(void *out, size_t outlen, const void *in, size_t inlen, const void *salt, size_t saltlen, unsigned int t_cost, unsigned int m_cost){
-	return lyra(in, inlen, salt, saltlen, t_cost, 64, m_cost, outlen, out);
-}
-
-/**
- Executes Lyra based on the G function from Blake 2.
-
  Inputs:
  	 pwd - user password
  	 pwdSize - password size
