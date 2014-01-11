@@ -35,7 +35,7 @@ extern "C" {
 static const PBKDF_M_COST = 2500;	// Number of 4KB rows to allocate => 10 MB
 static const PBKDF_T_COST = 4000;	// Number of iterations < 100 ms on desktop
 
-int tabby_password_verifier(const char salt[8], const void *username, int username_len, const void *realm, int realm_len, const void *password, int password_len, char client_secret[32], char password_verifier[72]) {
+int tabby_password(const char salt[8], const void *username, int username_len, const void *realm, int realm_len, const void *password, int password_len, char client_secret[32], char password_verifier[72]) {
 	char v[32];
 
 	// If Lyra fails,
@@ -47,7 +47,7 @@ int tabby_password_verifier(const char salt[8], const void *username, int userna
 	return 0;
 }
 
-int tabby_password_server_challenge(const void *username, int username_len, const char password_verifier[72], char challenge_secret[160], char challenge[72]) {
+int tabby_password_challenge(const void *username, int username_len, const char password_verifier[72], char challenge_secret[160], char challenge[72]) {
 }
 
 int tabby_password_client_proof(const char challenge[72], const char client_secret[32], const char password_verifier[72], char server_verifier[32], char client_proof[72]) {
@@ -56,7 +56,7 @@ int tabby_password_client_proof(const char challenge[72], const char client_secr
 int tabby_password_server_proof(const char client_proof[32], const char challenge_secret[160], char server_proof[32]) {
 }
 
-int tabby_password_check_server_proof(const char server_verifier[32], const char server_proof[32]) {
+int tabby_password_check_server(const char server_verifier[32], const char server_proof[32]) {
 }
 
 #ifdef __cplusplus

@@ -33,7 +33,7 @@
 extern "C" {
 #endif
 
-#define TABBY_VERSION 2
+#define TABBY_VERSION 3
 
 /*
  * Verify binary compatibility with the Tabby API on startup.
@@ -218,7 +218,7 @@ extern int tabby_verify(const void *message, int bytes, const char public_key[64
  * Returns 0 on success.
  * Returns non-zero if the input data is invalid.
  */
-extern int tabby_password_verifier(const char salt[8], const void *username, int username_len, const void *realm, int realm_len, const void *password, int password_len, char client_secret[32], char password_verifier[72]);
+extern int tabby_password(const char salt[8], const void *username, int username_len, const void *realm, int realm_len, const void *password, int password_len, char client_secret[32], char password_verifier[72]);
 
 /*
  * Generate a password challenge
@@ -229,7 +229,7 @@ extern int tabby_password_verifier(const char salt[8], const void *username, int
  * Returns 0 on success.
  * Returns non-zero if the input data is invalid.
  */
-extern int tabby_password_server_challenge(const void *username, int username_len, const char password_verifier[72], char challenge_secret[160], char challenge[72]);
+extern int tabby_password_challenge(const void *username, int username_len, const char password_verifier[72], char challenge_secret[160], char challenge[72]);
 
 /*
  * Respond to a password challenge from server
@@ -260,7 +260,7 @@ extern int tabby_password_server_proof(const char client_proof[32], const char c
  * Returns 0 on success.
  * Returns non-zero if the client's proof was invalid.
  */
-extern int tabby_password_check_server_proof(const char server_verifier[32], const char server_proof[32]);
+extern int tabby_password_check_server(const char server_verifier[32], const char server_proof[32]);
 
 
 //// Cleanup
