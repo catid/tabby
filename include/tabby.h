@@ -196,6 +196,73 @@ extern int tabby_sign(tabby_server *S, const void *message, int bytes, char sign
 extern int tabby_verify(const void *message, int bytes, const char public_key[64], const char signature[96]);
 
 
+//// Passwords
+
+/*
+ * Generate a verifier for the server to keep in its user database
+ *
+ * Combines the salt, username, realm, and password into a verifier.  This runs
+ * a password strengthening function, so it may take a while.
+ *
+ * The realm represents a unique string that specifies where the password will
+ * be used.
+ *
+ * Note that these are case-sensitive, so be sure to normalize the
+ * capitalization of e.g. the username, if required.
+ *
+ * The resulting 72-byte verifier value should be stored in the user database,
+ * so that the server can verify this password during login.
+ *
+ * The 'client_secret' parameter can be set to null if it is not needed.
+ *
+ * Returns 0 on success.
+ * Returns non-zero if the input data is invalid.
+ */
+extern int tabby_password_verifier(const char salt[8], const void *username, int username_len, const void *realm, int realm_len, const void *password, int password_len, char client_secret[32], char password_verifier[72]);
+
+/*
+ * Generate a password challenge
+ *
+ * The challenge should be sent to the client attempting to login.  And the
+ * challenge secret should be stored to validate the client's response.
+ *
+ * Returns 0 on success.
+ * Returns non-zero if the input data is invalid.
+ */
+extern int tabby_password_server_challenge(const void *username, int username_len, const char password_verifier[72], char challenge_secret[160], char challenge[72]);
+
+/*
+ * Respond to a password challenge from server
+ *
+ * The client_proof is sent by a client after the server has challenged them.
+ *
+ * Returns 0 on success.
+ * Returns non-zero if the server's challenge was invalid.
+ */
+extern int tabby_password_client_proof(const char challenge[72], const char client_secret[32], const char password_verifier[72], char server_verifier[32], char client_proof[72]);
+
+/*
+ * Respond to a password proof from client
+ *
+ * The server_proof is sent by a server after the client has provided proof.
+ *
+ * Returns 0 on success.
+ * Returns non-zero if the client's proof was invalid.
+ */
+extern int tabby_password_server_proof(const char client_proof[32], const char challenge_secret[160], char server_proof[32]);
+
+/*
+ * Verify a password proof from server
+ *
+ * This actually just compares to make sure the two values are the same, but it
+ * does this in constant-time.
+ *
+ * Returns 0 on success.
+ * Returns non-zero if the client's proof was invalid.
+ */
+extern int tabby_password_check_server_proof(const char server_verifier[32], const char server_proof[32]);
+
+
 //// Cleanup
 
 /*
