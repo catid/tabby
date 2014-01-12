@@ -26,9 +26,6 @@
 	POSSIBILITY OF SUCH DAMAGE.
 */
 
-#include <iostream>
-using namespace std;
-
 #include "lyra.h"
 #include "blake2.h"
 #include "SecureEqual.hpp"
@@ -92,7 +89,7 @@ static int generate_password_verifier(const char salt[8],
 		return -1;
 	}
 
-	// v = v mod q
+	// v = v (mod q) for uniform distribution
 	snowshoe_mod_q(v, v);
 
 	// If client secret is requested,
@@ -215,7 +212,7 @@ int tabby_password_client_proof(tabby_client *C, const void *username, int usern
 
 	// Generate client secret and password verifier from account data
 	const char *salt = challenge + 64;
-	char *client_secret = client_proof;
+	char *client_secret = E + 128 + 64;
 	char *password_verifier = E;
 
 	// Note that the "recoverable" error should never happen here, so any error is a failure
@@ -268,11 +265,6 @@ int tabby_password_client_proof(tabby_client *C, const void *username, int usern
 		// Z = (v + y)X
 	} while (snowshoe_elligator_secret(vy, Xp, E, 0, Z));
 
-	for (int ii = 0; ii < 64; ++ii) {
-		cout << (int)Z[ii];
-	}
-	cout << endl;
-
 	// PROOF = BLAKE2(E, SP, Z)
 	char *proof = E + 128 + 64;
 	blake2b_state B;
@@ -322,11 +314,6 @@ int tabby_password_server_proof(tabby_server *S, const char client_proof[96], co
 	if (snowshoe_elligator_secret(x, Yp, E, V, Z)) {
 		return -1;
 	}
-
-	for (int ii = 0; ii < 64; ++ii) {
-		cout << (int)Z[ii];
-	}
-	cout << endl;
 
 	// PROOF = BLAKE2(E, SP, Z)
 	char *proof = Z;
