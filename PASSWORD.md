@@ -22,6 +22,12 @@ information stored on the server to verify the user's login cannot be used to
 log into the server without brute-forcing the password.  This makes Tabby an
 "augmented" password protocol.
 
+And finally and most importantly, if the other party does not know the password,
+then they are given only one guess at the password per online exchange.  And
+there is no feasible way to crack the password offline based on what is learned
+during the communication otherwise.  This property stems from the zero-knowledge
+proofs at the heart of the protocol.
+
 Tabby password authentication also follows best password protection practices
 by incorporating salts, realms, strengthening, and a memory-intensive KDF to
 make passwords as difficult to crack as possible.
@@ -145,6 +151,11 @@ Client Online Processing:
 
 It is important that the client and server do not accept any messages
 except for password login messages until the proofs are received.
+
+
+#### Security Proof
+
+This is a work in progress.  Stay tuned.
 
 
 ### References
