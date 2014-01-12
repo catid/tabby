@@ -181,10 +181,13 @@ int tabby_password_challenge(tabby_server *S, const char password_verifier[72], 
 	// X' = xG + E
 	char *x = challenge_secret + 128;
 	do {
-		// Chose a random x
-		if (cymric_random(&state->rng, x, 32)) {
+		// Chose a random 512-bit x
+		if (cymric_random(&state->rng, x, 64)) {
 			return -1;
 		}
+
+		// x = x (mod q) for uniform distribution
+		snowshoe_mod_q(x, x);
 
 		// Retry while resulting point is invalid
 	} while (snowshoe_elligator_encrypt(x, E, challenge));
@@ -240,26 +243,29 @@ int tabby_password_client_proof(tabby_client *C, const void *username, int usern
 
 	const char *Xp = challenge;
 	const char *v = client_secret;
-	char *y = server_verifier;
+	char *y = E + 128;
 	char *vy = server_verifier;
 	char *Y = client_proof;
 	char *Z = E + 128;
 	do {
-		// Chose a random y
-		if (cymric_random(&state->rng, y, 32)) {
+		// Chose a random 512-bit y
+		if (cymric_random(&state->rng, y, 64)) {
 			return -1;
 		}
 
-		// vy = v + y (mod q)
-		snowshoe_add_mod_q(v, y, vy);
+		// y = y (mod q) for uniform distribution
+		snowshoe_mod_q(y, y);
 
 		// Y' = Y + E
 		if (snowshoe_elligator_encrypt(y, E, Y)) {
 			continue;
 		}
 
+		// vy = v + y (mod q)
+		snowshoe_add_mod_q(v, y, vy);
+
 		// X = (X' - E)
-		// Z = (v*h + y)X
+		// Z = (v + y)X
 	} while (snowshoe_elligator_secret(vy, Xp, E, 0, Z));
 
 	for (int ii = 0; ii < 64; ++ii) {
