@@ -82,7 +82,7 @@ static int generate_password_verifier(const char salt[8],
 	// Erase hash state
 	CAT_SECURE_OBJCLR(B);
 
-	// v = Lyra(chosen salt, pw)
+	// v = Lyra(salt, pw)
 	char *v = password_verifier;
 	if (lyra((u8 *)pw, 64, (const u8 *)salt, 8,
 			 PBKDF_T_COST, PBKDF_ROW_SIZE, PBKDF_M_COST, 64, (u8 *)v)) {
