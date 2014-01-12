@@ -248,4 +248,3 @@ int tabby_client_handshake(tabby_client *C, const char server_public_key[64], co
 }
 #endif
 
-

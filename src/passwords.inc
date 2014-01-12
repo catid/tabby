@@ -35,14 +35,80 @@ static const PBKDF_ROW_SIZE = 64;	// Number of 64-byte hash blocks per matrix ro
 static const PBKDF_M_COST = 2500;	// Number of 4KB rows to allocate => 10 MB
 static const PBKDF_T_COST = 4000;	// Number of iterations < 100 ms on desktop
 
+// Generate a client secret and server password verifier from account data
+// Returns -2 to indicate a recoverable error (read more on that case below)
+// Returns other non-zero values on unrecoverable errors
+// Returns 0 on success
+static int generate_password_verifier(const char salt[8],
+	const void *username, int username_len,
+	const void *realm, int realm_len,
+	const void *password, int password_len,
+	char client_secret[32], char password_verifier[64])
+{
+	blake2b_state B;
+
+	// pw = BLAKE2(username, realm, password)
+	char *pw = password_verifier; // Reuse buffer
+	if (blake2b_init(&B, 64)) {
+		return -1;
+	}
+	if (blake2b_update(&B, (const u8 *)username, username_len)) {
+		return -1;
+	}
+	if (blake2b_update(&B, (const u8 *)" : ", 3)) {
+		return -1;
+	}
+	// Realm is optional
+	if (realm && realm_len > 0) {
+		if (blake2b_update(&B, (const u8 *)realm, realm_len)) {
+			return -1;
+		}
+		if (blake2b_update(&B, (const u8 *)" : ", 3)) {
+			return -1;
+		}
+	}
+	if (blake2b_update(&B, (const u8 *)password, password_len)) {
+		return -1;
+	}
+	if (blake2b_final(&B, (u8 *)pw, 64)) {
+		return -1;
+	}
+
+	// Erase hash state
+	CAT_SECURE_OBJCLR(B);
+
+	// v = Lyra(chosen salt, pw)
+	const char *v = password_verifier;
+	if (lyra(pw, 64, salt, 8, PBKDF_T_COST, PBKDF_ROW_SIZE, PBKDF_M_COST, 64, v)) {
+		return -1;
+	}
+
+	// v = v mod q
+	snowshoe_mod_q(v, v);
+
+	// If client secret is requested,
+	if (client_secret) {
+		// Copy it out
+		memcpy(client_secret, v, 32);
+	}
+
+	// password_verifier = vG
+	if (snowshoe_mul_gen(v, password_verifier, 0)) {
+		// This is a recoverable error - Simply change the salt and try again.
+		// However this is so unlikely that it may never ever actually happen.
+		// Caller can check for this and try again.
+		return -2;
+	}
+
+	return 0;
+}
+
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-int tabby_password(tabby_client *C, const void *username, int username_len, const void *realm, int realm_len, const void *password, int password_len, char client_secret[32], char password_verifier[72]) {
+int tabby_password(tabby_client *C, const void *username, int username_len, const void *realm, int realm_len, const void *password, int password_len, char password_verifier[72]) {
 	client_internal *state = (client_internal *)C;
-	char *v = password_verifier; // Reuse output buffer for temporary space
-	blake2b_state B;
 	char salt[8];
 
 	// If input is invalid,
@@ -51,65 +117,38 @@ int tabby_password(tabby_client *C, const void *username, int username_len, cons
 		return -1;
 	}
 
+	int error;
 	do {
 		// Choose a new salt
 		if (cymric_random(&state->rng, salt, 8)) {
 			return -1;
 		}
 
-		// pw = BLAKE2(username, realm, password)
-		char *pw = v; // Reuse buffer
-		if (blake2b_init(&B, 64)) {
-			return -1;
-		}
-		if (blake2b_update(&B, (const u8 *)username, username_len)) {
-			return -1;
-		}
-		if (blake2b_update(&B, (const u8 *)" : ", 3)) {
-			return -1;
-		}
-		// Realm is optional
-		if (realm && realm_len > 0) {
-			if (blake2b_update(&B, (const u8 *)realm, realm_len)) {
-				return -1;
-			}
-			if (blake2b_update(&B, (const u8 *)" : ", 3)) {
-				return -1;
-			}
-		}
-		if (blake2b_update(&B, (const u8 *)password, password_len)) {
-			return -1;
-		}
-		if (blake2b_final(&B, (u8 *)pw, 64)) {
+		// Attempt to generate a verifier from the input.
+		// This can fail in some very rare cases, and sometimes the reaction
+		// should be to generate a new salt and try again.
+		error = generate_password_verifier(salt,
+					username, username_len,
+					realm, realm_len, // These can be 0 to skip the realm hash
+					password, password_len,
+					0, // Pass in 0 for client_secret - it is not needed
+					password_verifier);
+
+		// If unrecoverable error,
+		if (error == -1) {
 			return -1;
 		}
 
-		// v = Lyra(chosen salt, pw)
-		if (lyra(pw, 64, salt, 8, PBKDF_T_COST, PBKDF_ROW_SIZE, PBKDF_M_COST, 64, v)) {
-			return -1;
-		}
-
-		// v = v mod q
-		snowshoe_mod_q(v, v);
-
-		// If client_secret is requested,
-		if (client_secret) {
-			// Copy it from v
-			memcpy(client_secret, v, 32);
-		}
-
-		// password_verifier = vG
-	} while (snowshoe_mul_gen(v, password_verifier, 0));
+		// Loop while recoverable
+	} while (error == -2);
 
 	// Copy salt to end of password verifier
 	memcpy(password_verifier + 64, salt, 8);
 
-	CAT_SECURE_OBJCLR(B);
-
 	return 0;
 }
 
-int tabby_password_challenge(tabby_server *S, const char password_verifier[72], char challenge_secret[160], char challenge[104]) {
+int tabby_password_challenge(tabby_server *S, const char password_verifier[72], char challenge_secret[224], char challenge[72]) {
 	server_internal *state = (server_internal *)S;
 
 	// If invalid input,
@@ -130,15 +169,6 @@ int tabby_password_challenge(tabby_server *S, const char password_verifier[72], 
 		return -1;
 	}
 
-	// SN = Random 32 byte nonce
-	char *SN = challenge + 64 + 8;
-	if (cymric_random(&state->rng, SN, 32)) {
-		return -1;
-	}
-
-	// Add salt to challenge
-	memcpy(challenge + 64, password_verifier + 64, 8);
-
 	// X' = xG + E
 	char *x = challenge_secret + 128;
 	do {
@@ -150,31 +180,49 @@ int tabby_password_challenge(tabby_server *S, const char password_verifier[72], 
 		// Retry while resulting point is invalid
 	} while (snowshoe_elligator_encrypt(x, E, challenge));
 
+	// Store V
+	char *V = challenge_secret + 160;
+	memcpy(V, password_verifier, 64);
+
+	// Add salt to challenge
+	memcpy(challenge + 64, password_verifier + 64, 8);
+
 	return 0;
 }
 
-int tabby_password_client_proof(tabby_client *C, const char challenge[104], const char client_secret[32], const char password_verifier[72], char server_verifier[32], char client_proof[104]) {
+int tabby_password_client_proof(tabby_client *C, const void *username, int username_len, const void *realm, int realm_len, const void *password, int password_len, const char challenge[72], const char server_public[64], char server_verifier[32], char client_proof[96]) {
+	char E[128 + 64 + 64];
+	char *Z = E + 128;
+	char *proof = E + 128 + 64;
+
 	// If invalid input,
 	if (!C || !challenge || !client_secret || !password_verifier ||
 		!server_verifier || !client_proof) {
 		return -1;
 	}
 
+	// Generate client secret and password verifier from account data
+	const char *salt = challenge + 64;
+	char *client_secret = client_proof;
+	char *password_verifier = E;
+
+	// Note that the "recoverable" error should never happen here, so any error is a failure
+	if (generate_password_verifier(salt,
+					username, username_len,
+					realm, realm_len, // These can be 0 to skip the realm hash
+					password, password_len,
+					client_secret, password_verifier)) {
+		return -1;
+	}
+
 	// e = BLAKE2(V, salt)
-	char *e = client_proof;
+	char *e = E;
 	if (blake2b(e, password_verifier, 0, 32, 72, 0)) {
 		return -1;
 	}
 
 	// E = Elligator(e)
-	char E[128];
 	if (snowshoe_elligator(e, E)) {
-		return -1;
-	}
-
-	// CN = Random 32 byte nonce
-	char *CN = client_proof + 64 + 32;
-	if (cymric_random(&state->rng, SN, 32)) {
 		return -1;
 	}
 
@@ -184,8 +232,7 @@ int tabby_password_client_proof(tabby_client *C, const char challenge[104], cons
 	const char *v = client_secret;
 	char *y = server_verifier;
 	char *vy = client_proof;
-	char *Z = client_proof;
-	const char *V = password_verifier;
+	char *Y = client_proof;
 	do {
 		// Chose a random y
 		if (cymric_random(&state->rng, y, 32)) {
@@ -196,18 +243,80 @@ int tabby_password_client_proof(tabby_client *C, const char challenge[104], cons
 		snowshoe_add_mod_q(v, y, vy);
 
 		// While resulting point is invalid,
-	} while (snowshoe_elligator_secret(vy, C, E, V, Z));
+	} while (snowshoe_elligator_encrypt(y, E, Y) &&
+			 snowshoe_elligator_secret(vy, C, E, 0, Z));
+
+	// PROOF = BLAKE2(E, SP, Z)
+	blake2b_state B;
+	if (blake2b_init(&B, 64)) {
+		return -1;
+	}
+	if (blake2b_update(&B, (const u8 *)E, 128)) {
+		return -1;
+	}
+	if (blake2b_update(&B, (const u8 *)server_public, 64)) {
+		return -1;
+	}
+	if (blake2b_update(&B, (const u8 *)Z, 64)) {
+		return -1;
+	}
+	if (blake2b_final(&B, (u8 *)proof, 64)) {
+		return -1;
+	}
+
+	// CPROOF = Low 32 bytes of PROOF
+	memcpy(client_proof + 64, proof, 32);
+
+	// SPROOF = High 32 bytes of PROOF
+	memcpy(server_verifier, proof + 32, 32);
+
+	CAT_SECURE_OBJCLR(E);
 
 	return 0;
 }
 
-int tabby_password_server_proof(tabby_server *S, const char client_proof[32], const char challenge_secret[160], char server_proof[32]) {
+int tabby_password_server_proof(tabby_server *S, const char client_proof[96], const char challenge_secret[224], char server_proof[32]) {
 	// If invalid input,
 	if (!S || !client_proof || !challenge_secret || !server_proof) {
 		return -1;
 	}
 
-	// TODO
+	// Y = Y' - E
+	// Z = x(V + Y)
+	const char *C = client_proof;
+	const char *E = challenge_secret;
+	const char *x = challenge_secret + 128;
+	const char *V = challenge_secret + 160;
+	if (snowshoe_elligator_secret(x, C, E, V, Z)) {
+		return -1;
+	}
+
+	// PROOF = BLAKE2(E, SP, Z)
+	blake2b_state B;
+	if (blake2b_init(&B, 64)) {
+		return -1;
+	}
+	if (blake2b_update(&B, (const u8 *)E, 128)) {
+		return -1;
+	}
+	if (blake2b_update(&B, (const u8 *)server_public, 64)) {
+		return -1;
+	}
+	if (blake2b_update(&B, (const u8 *)Z, 64)) {
+		return -1;
+	}
+	if (blake2b_final(&B, (u8 *)proof, 64)) {
+		return -1;
+	}
+
+	// Recover CPROOF from client data
+	const char *cproof = client_proof + 64;
+	if (!SecureEqual(cproof, proof, 32)) {
+		return -1;
+	}
+
+	// SPROOF = High 32 bytes of PROOF
+	memcpy(server_proof, proof + 32, 32);
 
 	return 0;
 }
