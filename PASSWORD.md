@@ -2,7 +2,7 @@
 
 Tabby implements a new augmented zero-knowledge proof password authentication
 protocol based on the elliptic curve SPAKE2 protocol [1] modified for further
-efficiency by using Elligator.  It is designed to be a replacement for SRP6a
+efficiency by using Elligator [2].  It is designed to be a replacement for SRP6a
 that runs ~30x faster on the server.  Best practices for password strengthening
 are employed in this design.
 
@@ -151,4 +151,7 @@ except for password login messages until the proofs are received.
 
 ##### [1] ["Thesis: Reducing The Need For Trusted Parties In Cryptography" (Abdalla 2011)](http://www.di.ens.fr/~mabdalla/papers/hdrthesis.pdf)
 Provides thorough analysis of PAKE protocol SPAKE2, a basis for the Tabby protocol
+
+##### [2] ["Elligator: Elliptic-curve points indistinguishable from uniform random strings" (Bernstein Hamburg Krasnova Lange 2013)](http://elligator.cr.yp.to/elligator-20130828.pdf)
+Introduces the Elligator-2 point unpacking algorithm, which is implemented by Snowshoe
 

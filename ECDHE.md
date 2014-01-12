@@ -6,9 +6,11 @@ client.
 
 As a hand-waving argument for security, Tabby EC-DHE runs two EC-DH key agreement
 protocols, one based on the server's long-term secret, and another based on an
-ephemeral secret, and sums the result into one key.  It avoids exploits based on
+ephemeral secret, and sums the results into one key.  It avoids exploits based on
 the summation math by multiplying one of the keys by an ephemeral hash value
-agreed upon by both parties.  For detailed security arguments read more below.
+agreed upon by both parties, similar to how Schnorr signatures protect the
+long-term secret of the server, except that the sum is not revealed by Tabby.
+For detailed security arguments read more below.
 
 
 #### Tabby Key Generation Process : Algorithm 1

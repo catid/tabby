@@ -1,5 +1,5 @@
 # Tabby
-#### Strong, Fast, and Portable Cryptographic Signatures and Handshakes
+#### Strong, Fast, and Portable Cryptographic Signatures, Handshakes, and Password Authentication
 
 The Tabby key agreement protocol is designed for the situation where a client
 is attempting to connect to a server it has not connected to before.  After the
@@ -221,6 +221,7 @@ The result should be stored in the server database so that the server can verify
 
 ~~~
 	char password_verifier[72];
+
 	if (tabby_password(&c,
 					   username, strlen(username),
 					   realm, strlen(realm),
@@ -379,6 +380,10 @@ Two-round augmented zero-knowledge password authentication:
 + Client proof of password generated in 165639241 cycles, 97436 usec (one sample)
 + Server proof of password generated in 110015 cycles, 65 usec (one sample)
 + Client checked server password proof in 340 cycles, 0 usec (one sample)
+
+For comparison, DragonSRP based on the OpenSSL library takes *2 milliseconds* to
+run the server verification operation, while offering lower security levels than
+the "128 bits" provided by Tabby.
 
 
 ##### Performance Discussion
