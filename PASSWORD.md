@@ -78,9 +78,9 @@ c2s username
 Server Online Processing:
 
 ~~~
-	Lookup database entry for username, recovering "salt, V".
+	Lookup database entry for username, recovering "V".
 
-	E = snowshoe_elligator(H(V, salt)):
+	E = snowshoe_elligator(H(V)):
 		Elligator deterministically maps a 32 byte number to a curve point.
 
 	Choose random x = [1, q-1]
@@ -99,11 +99,9 @@ s2c salt, X'
 Client Online Processing:
 
 ~~~
-Regenerate V from password, salt:
+	v,V = tabby_password(username, realm, password, salt)
 
-	v,V = tabby_password(username, realm, password)
-
-	E = snowshoe_elligator(H(V, salt))
+	E = snowshoe_elligator(H(V))
 
 	Choose random y = [1, q-1]
 
