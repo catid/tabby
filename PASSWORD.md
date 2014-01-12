@@ -82,6 +82,7 @@ Server Online Processing:
 
 	E = snowshoe_elligator(H(V)):
 		Elligator deterministically maps a 32 byte number to a curve point.
+		The point is multiplied by 4 (see discussion).
 
 	Choose random x = [1, q-1]
 
@@ -149,6 +150,25 @@ Client Online Processing:
 
 It is important that the client and server do not accept any messages
 except for password login messages until the proofs are received.
+
+
+#### Protocol Discussion
+
+There is a flaw in this protocol that leads to an offline dictionary attack from the server's first response of X'.  X is always of order q, but Elligator generates points E of order 4q.  And the sum is sent in the clear.  So for example, if X' = X + E is of order q, then you can eliminate all passwords that do not lead to a point of order q.  The approach I took to fix this is to multiply the Elligator output by 4, which guarantees that the result is a point of order q.  However, more time needs to be spent validating this approach.
+
+Another area to pay attention to is how it is incorporated into the Tabby protocol.  I envision it being nested within a PKI-protected authenticated encryption scheme to allow for deniability, so that the client's username is not sent in the clear.  The issue that can happen is that if the server's public key is self-signed, then MitM is possible, and the attacker can relay the password protocol through to the real server to trick the user into thinking the attacker knows the password.  To prevent this, the server's public key makes an appearance in the final Z hash.  If the client is expecting the MitM public key, then the server will not verify correctly.
+
+Sadly, deniability is lost when the server's public key is self-signed because a MitM would be able to watch the exchange up until the final server proof message, which would tell the MitM that the user knows his own password.  So if the server's public key is not known ahead of time, an active attacker can determine if the client owns the account, despite that the client will discover the subterfuge.
+
+Some modifications to the protocol can be discussed:
+
+If the salt is removed from the protocol, then the client is able to send data earlier, which would remove one message from the protocol, and the server would send a proof before the client.  There are pros and cons to having the server prove knowledge first.  In both cases, both sides get to guess just one password.  However, all sources of information on password security indicate a salt twice as large as the birthday attack is essential, so it should not be removed.
+
+A larger salt can be chosen easily.  I'm considering increasing it to 16 bytes, though in my own estimation, a database of 4 billion users seems like a good upper limit already.
+
+Another modification could be to send a hash of the PROOF and keep the PROOF value as a shared secret key.  This would allow the protocol to be used as a drop-in replacement for SRP.  Since this is the only implementation, it may be a good idea.  Other re-organization ideas like splitting Cymric from Tabby are being considered to make it more flexible.
+
+Another way this could be changed is by including a SPAKE2+ pi_1 type verifier that is just a password hash.  This loses the augmented PAKE property, which a lot of people desire, in trade for making the client processing faster because he can verify himself without recomputing vG.  However in practice this is not a huge gain because the client needs to run a PBKDF that takes much longer than vG *anyway*.  So the client processing time is irrelevant.
 
 
 #### Security Proof
