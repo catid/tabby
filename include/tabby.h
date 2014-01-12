@@ -218,7 +218,7 @@ extern int tabby_verify(const void *message, int bytes, const char public_key[64
  * Returns 0 on success.
  * Returns non-zero if the input data is invalid.
  */
-extern int tabby_password(tabby_client *C, const void *username, int username_len, const void *realm, int realm_len, const void *password, int password_len, char client_secret[32], char password_verifier[72]);
+extern int tabby_password(tabby_client *C, const void *username, int username_len, const void *realm, int realm_len, const void *password, int password_len, char password_verifier[72]);
 
 /*
  * Generate a password challenge
@@ -229,7 +229,7 @@ extern int tabby_password(tabby_client *C, const void *username, int username_le
  * Returns 0 on success.
  * Returns non-zero if the input data is invalid.
  */
-extern int tabby_password_challenge(tabby_server *S, const void *username, int username_len, const char password_verifier[72], char challenge_secret[160], char challenge[72]);
+extern int tabby_password_challenge(tabby_server *S, const char password_verifier[72], char challenge_secret[224], char challenge[72]);
 
 /*
  * Respond to a password challenge from server
@@ -239,7 +239,7 @@ extern int tabby_password_challenge(tabby_server *S, const void *username, int u
  * Returns 0 on success.
  * Returns non-zero if the server's challenge was invalid.
  */
-extern int tabby_password_client_proof(tabby_client *C, const char challenge[72], const char client_secret[32], const char password_verifier[72], char server_verifier[32], char client_proof[72]);
+extern int tabby_password_client_proof(tabby_client *C, const void *username, int username_len, const void *realm, int realm_len, const void *password, int password_len, const char challenge[72], const char server_public[64], char server_verifier[32], char client_proof[96]);
 
 /*
  * Respond to a password proof from client
@@ -249,7 +249,7 @@ extern int tabby_password_client_proof(tabby_client *C, const char challenge[72]
  * Returns 0 on success.
  * Returns non-zero if the client's proof was invalid.
  */
-extern int tabby_password_server_proof(tabby_server *S, const char client_proof[32], const char challenge_secret[160], char server_proof[32]);
+extern int tabby_password_server_proof(tabby_server *S, const char client_proof[96], const char challenge_secret[224], char server_proof[32]);
 
 /*
  * Verify a password proof from server

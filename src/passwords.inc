@@ -26,14 +26,14 @@
 	POSSIBILITY OF SUCH DAMAGE.
 */
 
-#include "lyra/lyra.h"
-#include "blake2/blake2.h"
+#include "lyra.h"
+#include "blake2.h"
 #include "SecureEqual.hpp"
 
 // PBKDF parameters
-static const PBKDF_ROW_SIZE = 64;	// Number of 64-byte hash blocks per matrix row
-static const PBKDF_M_COST = 2500;	// Number of 4KB rows to allocate => 10 MB
-static const PBKDF_T_COST = 4000;	// Number of iterations < 100 ms on desktop
+static const int PBKDF_ROW_SIZE = 64;	// Number of 64-byte hash blocks per matrix row
+static const int PBKDF_M_COST = 2500;	// Number of 4KB rows to allocate => 10 MB
+static const int PBKDF_T_COST = 4000;	// Number of iterations < 100 ms on desktop
 
 // Generate a client secret and server password verifier from account data
 // Returns -2 to indicate a recoverable error (read more on that case below)
@@ -46,6 +46,12 @@ static int generate_password_verifier(const char salt[8],
 	char client_secret[32], char password_verifier[64])
 {
 	blake2b_state B;
+
+	if (!salt || !username || username_len < 1 ||
+		!password || password_len < 1 ||
+		!client_secret || !password_verifier) {
+		return -1;
+	}
 
 	// pw = BLAKE2(username, realm, password)
 	char *pw = password_verifier; // Reuse buffer
@@ -78,8 +84,9 @@ static int generate_password_verifier(const char salt[8],
 	CAT_SECURE_OBJCLR(B);
 
 	// v = Lyra(chosen salt, pw)
-	const char *v = password_verifier;
-	if (lyra(pw, 64, salt, 8, PBKDF_T_COST, PBKDF_ROW_SIZE, PBKDF_M_COST, 64, v)) {
+	char *v = password_verifier;
+	if (lyra((u8 *)pw, 64, (const u8 *)salt, 8,
+			 PBKDF_T_COST, PBKDF_ROW_SIZE, PBKDF_M_COST, 64, (u8 *)v)) {
 		return -1;
 	}
 
@@ -109,6 +116,7 @@ extern "C" {
 
 int tabby_password(tabby_client *C, const void *username, int username_len, const void *realm, int realm_len, const void *password, int password_len, char password_verifier[72]) {
 	client_internal *state = (client_internal *)C;
+
 	char salt[8];
 
 	// If input is invalid,
@@ -152,14 +160,13 @@ int tabby_password_challenge(tabby_server *S, const char password_verifier[72], 
 	server_internal *state = (server_internal *)S;
 
 	// If invalid input,
-	if (!username || username_len < 1 || !password_verifier ||
-		!challenge_secret || !challenge) {
+	if (!S || !password_verifier || !challenge_secret || !challenge) {
 		return -1;
 	}
 
 	// e = BLAKE2(V, salt)
 	char *e = challenge_secret;
-	if (blake2b(e, password_verifier, 0, 32, 72, 0)) {
+	if (blake2b((u8 *)e, password_verifier, 0, 32, 72, 0)) {
 		return -1;
 	}
 
@@ -191,13 +198,13 @@ int tabby_password_challenge(tabby_server *S, const char password_verifier[72], 
 }
 
 int tabby_password_client_proof(tabby_client *C, const void *username, int username_len, const void *realm, int realm_len, const void *password, int password_len, const char challenge[72], const char server_public[64], char server_verifier[32], char client_proof[96]) {
+	client_internal *state = (client_internal *)C;
+
 	char E[128 + 64 + 64];
-	char *Z = E + 128;
-	char *proof = E + 128 + 64;
 
 	// If invalid input,
-	if (!C || !challenge || !client_secret || !password_verifier ||
-		!server_verifier || !client_proof) {
+	if (!C || !username || username_len < 1 || !password || password_len < 1 ||
+		!challenge || !server_public || !server_verifier || !client_proof) {
 		return -1;
 	}
 
@@ -217,7 +224,7 @@ int tabby_password_client_proof(tabby_client *C, const void *username, int usern
 
 	// e = BLAKE2(V, salt)
 	char *e = E;
-	if (blake2b(e, password_verifier, 0, 32, 72, 0)) {
+	if (blake2b((u8 *)e, password_verifier, 0, 32, 72, 0)) {
 		return -1;
 	}
 
@@ -226,13 +233,14 @@ int tabby_password_client_proof(tabby_client *C, const void *username, int usern
 		return -1;
 	}
 
-	// X = (C - E)
+	// X = (X' - E)
 	// Z = (v*h + y)X
-	const char *C = challenge;
+	const char *Xp = challenge;
 	const char *v = client_secret;
 	char *y = server_verifier;
 	char *vy = client_proof;
 	char *Y = client_proof;
+	char *Z = E + 128;
 	do {
 		// Chose a random y
 		if (cymric_random(&state->rng, y, 32)) {
@@ -240,13 +248,14 @@ int tabby_password_client_proof(tabby_client *C, const void *username, int usern
 		}
 
 		// vy = v + y (mod q)
-		snowshoe_add_mod_q(v, y, vy);
+		//snowshoe_add_mod_q(v, y, vy);
 
 		// While resulting point is invalid,
 	} while (snowshoe_elligator_encrypt(y, E, Y) &&
-			 snowshoe_elligator_secret(vy, C, E, 0, Z));
+			 snowshoe_elligator_secret(vy, Xp, E, 0, Z));
 
 	// PROOF = BLAKE2(E, SP, Z)
+	char *proof = E + 128 + 64;
 	blake2b_state B;
 	if (blake2b_init(&B, 64)) {
 		return -1;
@@ -276,6 +285,10 @@ int tabby_password_client_proof(tabby_client *C, const void *username, int usern
 }
 
 int tabby_password_server_proof(tabby_server *S, const char client_proof[96], const char challenge_secret[224], char server_proof[32]) {
+	server_internal *state = (server_internal *)S;
+
+	char Z[64];
+
 	// If invalid input,
 	if (!S || !client_proof || !challenge_secret || !server_proof) {
 		return -1;
@@ -283,15 +296,16 @@ int tabby_password_server_proof(tabby_server *S, const char client_proof[96], co
 
 	// Y = Y' - E
 	// Z = x(V + Y)
-	const char *C = client_proof;
+	const char *Yp = client_proof;
 	const char *E = challenge_secret;
 	const char *x = challenge_secret + 128;
 	const char *V = challenge_secret + 160;
-	if (snowshoe_elligator_secret(x, C, E, V, Z)) {
+	if (snowshoe_elligator_secret(x, Yp, E, V, Z)) {
 		return -1;
 	}
 
 	// PROOF = BLAKE2(E, SP, Z)
+	char *proof = Z;
 	blake2b_state B;
 	if (blake2b_init(&B, 64)) {
 		return -1;
@@ -299,7 +313,7 @@ int tabby_password_server_proof(tabby_server *S, const char client_proof[96], co
 	if (blake2b_update(&B, (const u8 *)E, 128)) {
 		return -1;
 	}
-	if (blake2b_update(&B, (const u8 *)server_public, 64)) {
+	if (blake2b_update(&B, (const u8 *)state->public_key, 64)) {
 		return -1;
 	}
 	if (blake2b_update(&B, (const u8 *)Z, 64)) {

@@ -9,7 +9,7 @@ CC = clang -m64
 OPTFLAGS = -O3
 DBGFLAGS = -g -O0 -DDEBUG
 CFLAGS = -Wall -fstrict-aliasing -I./blake2/sse -I./libcat -I./include \
-		 -I./snowshoe/include -I./cymric/include
+		 -I./snowshoe/include -I./cymric/include -I./lyra
 LIBNAME = bin/libtabby.a
 LIBS = -lsnowshoe -lcymric
 
