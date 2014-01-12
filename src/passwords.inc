@@ -224,6 +224,9 @@ int tabby_password_client_proof(tabby_client *C, const void *username, int usern
 		return -1;
 	}
 
+	// Set salt in verifier
+	memcpy(password_verifier + 64, salt, 8);
+
 	// e = BLAKE2(V, salt)
 	char *e = E;
 	if (blake2b((u8 *)e, password_verifier, 0, 32, 72, 0)) {
@@ -235,12 +238,10 @@ int tabby_password_client_proof(tabby_client *C, const void *username, int usern
 		return -1;
 	}
 
-	// X = (X' - E)
-	// Z = (v*h + y)X
 	const char *Xp = challenge;
 	const char *v = client_secret;
 	char *y = server_verifier;
-	char *vy = client_proof;
+	char *vy = server_verifier;
 	char *Y = client_proof;
 	char *Z = E + 128;
 	do {
@@ -252,9 +253,19 @@ int tabby_password_client_proof(tabby_client *C, const void *username, int usern
 		// vy = v + y (mod q)
 		snowshoe_add_mod_q(v, y, vy);
 
-		// While resulting point is invalid,
-	} while (snowshoe_elligator_encrypt(y, E, Y) &&
-			 snowshoe_elligator_secret(vy, Xp, E, 0, Z));
+		// Y' = Y + E
+		if (snowshoe_elligator_encrypt(y, E, Y)) {
+			continue;
+		}
+
+		// X = (X' - E)
+		// Z = (v*h + y)X
+	} while (snowshoe_elligator_secret(vy, Xp, E, 0, Z));
+
+	for (int ii = 0; ii < 64; ++ii) {
+		cout << (int)Z[ii];
+	}
+	cout << endl;
 
 	// PROOF = BLAKE2(E, SP, Z)
 	char *proof = E + 128 + 64;
@@ -305,6 +316,11 @@ int tabby_password_server_proof(tabby_server *S, const char client_proof[96], co
 	if (snowshoe_elligator_secret(x, Yp, E, V, Z)) {
 		return -1;
 	}
+
+	for (int ii = 0; ii < 64; ++ii) {
+		cout << (int)Z[ii];
+	}
+	cout << endl;
 
 	// PROOF = BLAKE2(E, SP, Z)
 	char *proof = Z;
