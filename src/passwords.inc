@@ -26,14 +26,17 @@
 	POSSIBILITY OF SUCH DAMAGE.
 */
 
+#include <iostream>
+using namespace std;
+
 #include "lyra.h"
 #include "blake2.h"
 #include "SecureEqual.hpp"
 
 // PBKDF parameters
 static const int PBKDF_ROW_SIZE = 64;	// Number of 64-byte hash blocks per matrix row
-static const int PBKDF_M_COST = 2500;	// Number of 4KB rows to allocate => 10 MB
-static const int PBKDF_T_COST = 4000;	// Number of iterations < 100 ms on desktop
+static const int PBKDF_M_COST = 8;		// Number of 4KB rows to allocate => 32KB
+static const int PBKDF_T_COST = 1000;	// Number of iterations for 90 milliseconds on laptop
 
 // Generate a client secret and server password verifier from account data
 // Returns -2 to indicate a recoverable error (read more on that case below)
@@ -48,8 +51,7 @@ static int generate_password_verifier(const char salt[8],
 	blake2b_state B;
 
 	if (!salt || !username || username_len < 1 ||
-		!password || password_len < 1 ||
-		!client_secret || !password_verifier) {
+		!password || password_len < 1 || !password_verifier) {
 		return -1;
 	}
 
@@ -248,7 +250,7 @@ int tabby_password_client_proof(tabby_client *C, const void *username, int usern
 		}
 
 		// vy = v + y (mod q)
-		//snowshoe_add_mod_q(v, y, vy);
+		snowshoe_add_mod_q(v, y, vy);
 
 		// While resulting point is invalid,
 	} while (snowshoe_elligator_encrypt(y, E, Y) &&

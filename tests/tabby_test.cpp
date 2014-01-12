@@ -104,7 +104,7 @@ int main() {
 
 	assert(0 == tabby_server_get_public_key(&s, public_key));
 
-	cout << "+ Successfully created a new server key in " << (c1 - c0) << " cycles, " << (t1 - t0) << " usec" << endl;
+	cout << "+ Successfully created a new server key in " << (c1 - c0) << " cycles, " << (t1 - t0) << " usec (one sample)" << endl;
 
 	// Signature test:
 
@@ -187,7 +187,7 @@ int main() {
 	c1 = Clock::cycles();
 	t1 = m_clock.usec();
 
-	cout << "+ Generated a client key in " << (c1 - c0) << " cycles, " << (t1 - t0) << " usec" << endl;
+	cout << "+ Generated a client key in " << (c1 - c0) << " cycles, " << (t1 - t0) << " usec (one sample)" << endl;
 
 	vector<u32> tr, ts, tc;
 	double wr = 0, ws = 0, wc = 0;
@@ -261,6 +261,72 @@ int main() {
 	cout << "+ Tabby client rekey: `" << dec << mr << "` median cycles, `" << wr << "` avg usec" << endl;
 	cout << "+ Tabby server handshake: `" << dec << ms << "` median cycles, `" << ws << "` avg usec (`" << cps << "` connections/second)" << endl;
 	cout << "+ Tabby client handshake: `" << dec << mc << "` median cycles, `" << wc << "` avg usec" << endl;
+
+
+	// Password authentication:
+
+	const char *username = "catid";
+	const char *realm = "AWESOME APP";
+	const char *password = "password1";
+
+	t0 = m_clock.usec();
+	c0 = Clock::cycles();
+
+	// Generate server database entry for user
+	char password_verifier[72];
+	assert(!tabby_password(&c, username, strlen(username), realm, strlen(realm), password, strlen(password), password_verifier));
+
+	c1 = Clock::cycles();
+	t1 = m_clock.usec();
+
+	cout << "+ Client generated server verifier for password database in " << (c1 - c0) << " cycles, " << (t1 - t0) << " usec (one sample)" << endl;
+
+	t0 = m_clock.usec();
+	c0 = Clock::cycles();
+
+	// Generate challenge message and secret
+	char challenge_secret[224], challenge[72];
+	assert(!tabby_password_challenge(&s, password_verifier, challenge_secret, challenge));
+
+	c1 = Clock::cycles();
+	t1 = m_clock.usec();
+
+	cout << "+ Server password challenge generated in " << (c1 - c0) << " cycles, " << (t1 - t0) << " usec (one sample)" << endl;
+
+	t0 = m_clock.usec();
+	c0 = Clock::cycles();
+
+	// Generate client proof and server verifier
+	char server_verifier[32], client_proof[96];
+	assert(!tabby_password_client_proof(&c, username, strlen(username), realm, strlen(realm), password, strlen(password), challenge, public_key, server_verifier, client_proof));
+
+	c1 = Clock::cycles();
+	t1 = m_clock.usec();
+
+	cout << "+ Client proof of password generated in " << (c1 - c0) << " cycles, " << (t1 - t0) << " usec (one sample)" << endl;
+
+	t0 = m_clock.usec();
+	c0 = Clock::cycles();
+
+	// Generate server proof
+	char server_proof[32];
+	assert(!tabby_password_server_proof(&s, client_proof, challenge_secret, server_proof));
+
+	c1 = Clock::cycles();
+	t1 = m_clock.usec();
+
+	cout << "+ Server proof of password generated in " << (c1 - c0) << " cycles, " << (t1 - t0) << " usec (one sample)" << endl;
+
+	t0 = m_clock.usec();
+	c0 = Clock::cycles();
+
+	// Verify server proof
+	assert(!tabby_password_check_server(server_proof, server_verifier));
+
+	c1 = Clock::cycles();
+	t1 = m_clock.usec();
+
+	cout << "+ Client checked server password proof in " << (c1 - c0) << " cycles, " << (t1 - t0) << " usec (one sample)" << endl;
 
 	cout << "Tests succeeded!" << endl;
 

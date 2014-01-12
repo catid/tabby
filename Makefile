@@ -18,7 +18,7 @@ LIBS = -lsnowshoe -lcymric
 
 shared_test_o = Clock.o
 
-tabby_o = tabby.o blake2b.o SecureErase.o SecureEqual.o
+tabby_o = tabby.o blake2b.o SecureErase.o SecureEqual.o lyra.o sponge.o
 
 tabby_test_o = tabby_test.o $(shared_test_o)
 
