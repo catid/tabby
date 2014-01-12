@@ -49,7 +49,7 @@ H(m) is BLAKE2-bp.
 
 CSPRNG is [Cymric](https://github.com/catid/cymric).
 
-v,V = tabby_password(username, realm, password):
+v,V, salt = tabby_password(username, realm, password):
 
 ~~~
 	salt = CSPRNG(8 bytes)
@@ -57,7 +57,7 @@ v,V = tabby_password(username, realm, password):
 	v = PBKDF(salt, pw) [512 bits, 64 bytes]
 	v = v (mod q) [using Snowshoe, q = prime subgroup order]
 	Repeat from the top if v = 0.
-	V = salt || vG [using Snowshoe, 72 bytes]
+	V = vG [using Snowshoe, 72 bytes]
 ~~~
 
 
@@ -78,9 +78,9 @@ c2s username
 Server Online Processing:
 
 ~~~
-	Lookup database entry for username, recovering "V".
+	Lookup database entry for username, recovering "V, salt".
 
-	E = snowshoe_elligator(H(V)):
+	E = snowshoe_elligator(H(V, salt)):
 		Elligator deterministically maps a 32 byte number to a curve point.
 		The point is multiplied by 4 (see discussion).
 
@@ -102,7 +102,7 @@ Client Online Processing:
 ~~~
 	v,V = tabby_password(username, realm, password, salt)
 
-	E = snowshoe_elligator(H(V))
+	E = snowshoe_elligator(H(V, salt))
 
 	Choose random y = [1, q-1]
 
