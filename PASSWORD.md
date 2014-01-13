@@ -40,12 +40,12 @@ Some of the functions run during the protocol should be specified:
 PBKDF(pw, salt) is [Lyra](http://eprint.iacr.org/2014/030.pdf) with parameters:
 
 + saltSize = 16 bytes
-+ timeCost = 10 (# of iterations)
++ timeCost = 2 (# of iterations)
 + blocksPerRow = 64 (# of 64 byte hash blocks per matrix row)
-+ nRows = 1000 (# of 4KB rows => 4MB)
++ nRows = 3000 (# of 4KB rows => 12MB)
 + Output = 64 bytes
 
-This runs in about 120 milliseconds on a laptop.  BCRYPT or some other PBKDF
+This runs in about ~100 milliseconds on a laptop.  BCRYPT or some other PBKDF
 may be a better choice here, based on what happens in the [PHC](https://password-hashing.net/).
 
 H(m) is BLAKE2-bp.
