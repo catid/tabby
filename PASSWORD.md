@@ -171,8 +171,6 @@ A larger salt can be chosen easily.  I'm considering increasing it to 16 bytes, 
 
 Another modification could be to send a hash of the PROOF and keep the PROOF value as a shared secret key.  This would allow the protocol to be used as a drop-in replacement for SRP.  Since this is the only implementation, it may be a good idea.  Other re-organization ideas like splitting Cymric from Tabby are being considered to make it more flexible.
 
-Another way this could be changed is by including a SPAKE2+ pi_1 type verifier that is just a password hash.  This loses the augmented PAKE property, which a lot of people desire, in trade for making the client processing faster because he can verify himself without recomputing vG.  However in practice this is not a huge gain because the client needs to run a PBKDF that takes much longer than vG *anyway*.  So the client processing time is irrelevant.
-
 
 #### Security Proof
 
