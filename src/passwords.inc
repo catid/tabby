@@ -32,8 +32,8 @@
 
 // PBKDF parameters
 static const int PBKDF_ROW_SIZE = 64;	// Number of 64-byte hash blocks per matrix row
-static const int PBKDF_M_COST = 8;		// Number of 4KB rows to allocate => 32KB
-static const int PBKDF_T_COST = 1000;	// Number of iterations for 90 milliseconds on laptop
+static const int PBKDF_M_COST = 1000;	// Number of 4KB rows to allocate => 4MB
+static const int PBKDF_T_COST = 10;		// Number of iterations for 120 milliseconds on laptop
 
 // Generate a client secret and server password verifier from account data
 // Returns -2 to indicate a recoverable error (read more on that case below)

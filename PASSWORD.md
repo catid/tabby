@@ -37,13 +37,16 @@ make passwords as difficult to crack as possible.
 
 Some of the functions run during the protocol should be specified:
 
-PBKDF(pw, salt) is Lyra with parameters:
+PBKDF(pw, salt) is [Lyra](http://eprint.iacr.org/2014/030.pdf) with parameters:
 
 + saltSize = 8 bytes
-+ timeCost = 1000 (# of iterations)
++ timeCost = 10 (# of iterations)
 + blocksPerRow = 64 (# of 64 byte hash blocks per matrix row)
-+ nRows = 8 (# of 4KB rows => 32KB)
++ nRows = 1000 (# of 4KB rows => 4MB)
 + Output = 64 bytes
+
+This runs in about 120 milliseconds on a laptop.  BCRYPT or some other PBKDF
+may be a better choice here, based on what happens in the [PHC](https://password-hashing.net/).
 
 H(m) is BLAKE2-bp.
 
