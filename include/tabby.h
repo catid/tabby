@@ -210,7 +210,7 @@ extern int tabby_verify(const void *message, int bytes, const char public_key[64
  * Note that these are case-sensitive, so be sure to normalize the
  * capitalization of e.g. the username, if required.
  *
- * The resulting 72-byte verifier value should be stored in the user database,
+ * The resulting 80-byte verifier value should be stored in the user database,
  * so that the server can verify this password during login.
  *
  * The 'client_secret' parameter can be set to null if it is not needed.
@@ -218,7 +218,7 @@ extern int tabby_verify(const void *message, int bytes, const char public_key[64
  * Returns 0 on success.
  * Returns non-zero if the input data is invalid.
  */
-extern int tabby_password(tabby_client *C, const void *username, int username_len, const void *realm, int realm_len, const void *password, int password_len, char password_verifier[72]);
+extern int tabby_password(tabby_client *C, const void *username, int username_len, const void *realm, int realm_len, const void *password, int password_len, char password_verifier[80]);
 
 /*
  * Generate a password challenge
@@ -229,7 +229,7 @@ extern int tabby_password(tabby_client *C, const void *username, int username_le
  * Returns 0 on success.
  * Returns non-zero if the input data is invalid.
  */
-extern int tabby_password_challenge(tabby_server *S, const char password_verifier[72], char challenge_secret[224], char challenge[72]);
+extern int tabby_password_challenge(tabby_server *S, const char password_verifier[80], char challenge_secret[224], char challenge[80]);
 
 /*
  * Respond to a password challenge from server
@@ -239,7 +239,7 @@ extern int tabby_password_challenge(tabby_server *S, const char password_verifie
  * Returns 0 on success.
  * Returns non-zero if the server's challenge was invalid.
  */
-extern int tabby_password_client_proof(tabby_client *C, const void *username, int username_len, const void *realm, int realm_len, const void *password, int password_len, const char challenge[72], const char server_public[64], char server_verifier[32], char client_proof[96]);
+extern int tabby_password_client_proof(tabby_client *C, const void *username, int username_len, const void *realm, int realm_len, const void *password, int password_len, const char challenge[80], const char server_public[64], char server_verifier[32], char client_proof[96]);
 
 /*
  * Respond to a password proof from client

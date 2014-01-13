@@ -39,7 +39,7 @@ Some of the functions run during the protocol should be specified:
 
 PBKDF(pw, salt) is [Lyra](http://eprint.iacr.org/2014/030.pdf) with parameters:
 
-+ saltSize = 8 bytes
++ saltSize = 16 bytes
 + timeCost = 10 (# of iterations)
 + blocksPerRow = 64 (# of 64 byte hash blocks per matrix row)
 + nRows = 1000 (# of 4KB rows => 4MB)
@@ -55,7 +55,7 @@ CSPRNG is [Cymric](https://github.com/catid/cymric).
 v,V, salt = tabby_password(username, realm, password):
 
 ~~~
-	salt = CSPRNG(8 bytes)
+	salt = CSPRNG(16 bytes)
 	pw = H("username : realm : password")
 	v = PBKDF(salt, pw) [512 bits, 64 bytes]
 	v = v (mod q) [using Snowshoe, q = prime subgroup order]
@@ -97,7 +97,7 @@ Server Online Processing:
 Server transmits:
 
 ~~~
-s2c salt, X'
+s2c salt[16 bytes], X'[64 bytes]
 ~~~
 
 Client Online Processing:
@@ -124,7 +124,7 @@ Client Online Processing:
 Client transmits:
 
 ~~~
-c2s Y', CPROOF
+c2s Y'[64 bytes], CPROOF[32 bytes]
 ~~~
 
 Server Online Processing:
@@ -142,7 +142,7 @@ Server Online Processing:
 Server transmits:
 
 ~~~
-s2c SPROOF
+s2c SPROOF[32 bytes]
 ~~~
 
 Client Online Processing:

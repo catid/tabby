@@ -31,6 +31,7 @@
 #include "SecureEqual.hpp"
 
 // PBKDF parameters
+static const int PBKDF_SALT_SIZE = 16;	// 16 bytes
 static const int PBKDF_ROW_SIZE = 64;	// Number of 64-byte hash blocks per matrix row
 static const int PBKDF_M_COST = 1000;	// Number of 4KB rows to allocate => 4MB
 static const int PBKDF_T_COST = 10;		// Number of iterations for 120 milliseconds on laptop
@@ -39,7 +40,7 @@ static const int PBKDF_T_COST = 10;		// Number of iterations for 120 millisecond
 // Returns -2 to indicate a recoverable error (read more on that case below)
 // Returns other non-zero values on unrecoverable errors
 // Returns 0 on success
-static int generate_password_verifier(const char salt[8],
+static int generate_password_verifier(const char salt[PBKDF_SALT_SIZE],
 	const void *username, int username_len,
 	const void *realm, int realm_len,
 	const void *password, int password_len,
@@ -84,7 +85,7 @@ static int generate_password_verifier(const char salt[8],
 
 	// v = Lyra(salt, pw)
 	char *v = password_verifier;
-	if (lyra((u8 *)pw, 64, (const u8 *)salt, 8,
+	if (lyra((u8 *)pw, 64, (const u8 *)salt, PBKDF_SALT_SIZE,
 			 PBKDF_T_COST, PBKDF_ROW_SIZE, PBKDF_M_COST, 64, (u8 *)v)) {
 		return -1;
 	}
@@ -113,10 +114,10 @@ static int generate_password_verifier(const char salt[8],
 extern "C" {
 #endif
 
-int tabby_password(tabby_client *C, const void *username, int username_len, const void *realm, int realm_len, const void *password, int password_len, char password_verifier[72]) {
+int tabby_password(tabby_client *C, const void *username, int username_len, const void *realm, int realm_len, const void *password, int password_len, char password_verifier[80]) {
 	client_internal *state = (client_internal *)C;
 
-	char salt[8];
+	char salt[PBKDF_SALT_SIZE];
 
 	// If input is invalid,
 	if (!C || !username || username_len < 1 ||
@@ -127,7 +128,7 @@ int tabby_password(tabby_client *C, const void *username, int username_len, cons
 	int error;
 	do {
 		// Choose a new salt
-		if (cymric_random(&state->rng, salt, 8)) {
+		if (cymric_random(&state->rng, salt, PBKDF_SALT_SIZE)) {
 			return -1;
 		}
 
@@ -150,12 +151,12 @@ int tabby_password(tabby_client *C, const void *username, int username_len, cons
 	} while (error == -2);
 
 	// Copy salt to end of password verifier
-	memcpy(password_verifier + 64, salt, 8);
+	memcpy(password_verifier + 64, salt, PBKDF_SALT_SIZE);
 
 	return 0;
 }
 
-int tabby_password_challenge(tabby_server *S, const char password_verifier[72], char challenge_secret[224], char challenge[72]) {
+int tabby_password_challenge(tabby_server *S, const char password_verifier[80], char challenge_secret[224], char challenge[80]) {
 	server_internal *state = (server_internal *)S;
 
 	// If invalid input,
@@ -194,12 +195,12 @@ int tabby_password_challenge(tabby_server *S, const char password_verifier[72], 
 	memcpy(V, password_verifier, 64);
 
 	// Add salt to challenge
-	memcpy(challenge + 64, password_verifier + 64, 8);
+	memcpy(challenge + 64, password_verifier + 64, PBKDF_SALT_SIZE);
 
 	return 0;
 }
 
-int tabby_password_client_proof(tabby_client *C, const void *username, int username_len, const void *realm, int realm_len, const void *password, int password_len, const char challenge[72], const char server_public[64], char server_verifier[32], char client_proof[96]) {
+int tabby_password_client_proof(tabby_client *C, const void *username, int username_len, const void *realm, int realm_len, const void *password, int password_len, const char challenge[80], const char server_public[64], char server_verifier[32], char client_proof[96]) {
 	client_internal *state = (client_internal *)C;
 
 	char E[128 + 64 + 64];
@@ -225,7 +226,7 @@ int tabby_password_client_proof(tabby_client *C, const void *username, int usern
 	}
 
 	// Set salt in verifier
-	memcpy(password_verifier + 64, salt, 8);
+	memcpy(password_verifier + 64, salt, PBKDF_SALT_SIZE);
 
 	// e = BLAKE2(V, salt)
 	char *e = E;

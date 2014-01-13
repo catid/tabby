@@ -273,7 +273,7 @@ int main() {
 	c0 = Clock::cycles();
 
 	// Generate server database entry for user
-	char password_verifier[72];
+	char password_verifier[80];
 	assert(!tabby_password(&c, username, strlen(username), realm, strlen(realm), password, strlen(password), password_verifier));
 
 	c1 = Clock::cycles();
@@ -285,7 +285,7 @@ int main() {
 	c0 = Clock::cycles();
 
 	// Generate challenge message and secret
-	char challenge_secret[224], challenge[72];
+	char challenge_secret[224], challenge[80];
 	assert(!tabby_password_challenge(&s, password_verifier, challenge_secret, challenge));
 
 	c1 = Clock::cycles();
