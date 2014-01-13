@@ -167,8 +167,6 @@ Some modifications to the protocol can be discussed:
 
 If the salt is removed from the protocol, then the client is able to send data earlier, which would remove one message from the protocol, and the server would send a proof before the client.  There are pros and cons to having the server prove knowledge first.  In both cases, both sides get to guess just one password.  However, all sources of information on password security indicate a salt twice as large as the birthday attack is essential, so it should not be removed.
 
-A larger salt can be chosen easily.  I'm considering increasing it to 16 bytes, though in my own estimation, a database of 4 billion users seems like a good upper limit already.
-
 Another modification could be to send a hash of the PROOF and keep the PROOF value as a shared secret key.  This would allow the protocol to be used as a drop-in replacement for SRP.  Since this is the only implementation, it may be a good idea.  Other re-organization ideas like splitting Cymric from Tabby are being considered to make it more flexible.
 
 
