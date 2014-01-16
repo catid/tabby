@@ -116,6 +116,29 @@ static int generate_password_verifier(const char salt[PBKDF_SALT_SIZE],
 extern "C" {
 #endif
 
+/*
+	tabby_password(
+		C,
+		username, username_len,
+		realm, realm_len,
+		password, password_len,
+		password_verifier [OUT])
+
+	This function generates a random salt from the CSPRNG, then proceeds to
+	securely hash the username, realm, password, and salt together with a
+	password-based key derivation function (PBKDF).
+
+	The output is the password_verifier.
+
+	Packed data formats:
+
+		Outputs:
+
+			password_verifier	[80 bytes]
+				V = vG			[64 bytes]
+				Salt			[16 bytes]
+*/
+
 int tabby_password(tabby_client *C, const void *username, int username_len, const void *realm, int realm_len, const void *password, int password_len, char password_verifier[80]) {
 	client_internal *state = (client_internal *)C;
 
@@ -158,7 +181,48 @@ int tabby_password(tabby_client *C, const void *username, int username_len, cons
 	return 0;
 }
 
-int tabby_password_challenge(tabby_server *S, const char password_verifier[80], char challenge_secret[224], char challenge[80]) {
+/*
+	tabby_password_challenge(
+		S,
+		password_verifier [IN],
+		challenge_secret [OUT],
+		challenge [OUT])
+
+	After the user has sent his username, the server runs this function
+	to generate a password authentication challenge that the user must
+	answer before being allowed access to the server.
+
+	It generates a "challenge_secret" that is stored internally to the
+	server to process the client's response to the challenge.  This
+	must not be shared with the client.
+
+	It also generates a "challenge" that should be sent to the client.
+
+	If the client fails to login, then the server should run this function
+	again rather than caching the results and reusing them.
+
+	Packed data formats:
+
+		Inputs:
+
+			password_verifier	[80 bytes]
+				V = vG			[64 bytes]
+				Salt			[16 bytes]
+
+		Outputs:
+
+			challenge_secret	[288 bytes]
+				E (extended)	[128 bytes]
+				x				[32 bytes]
+				V				[64 bytes]
+				X' = X + E		[64 bytes]
+
+			challenge			[80 bytes]
+				X'				[64 bytes]
+				Salt			[16 bytes]
+*/
+
+int tabby_password_challenge(tabby_server *S, const char password_verifier[80], char challenge_secret[288], char challenge[80]) {
 	server_internal *state = (server_internal *)S;
 
 	// If invalid input,
@@ -179,6 +243,7 @@ int tabby_password_challenge(tabby_server *S, const char password_verifier[80], 
 	}
 
 	// X' = xG + E
+	char *Xp = challenge_secret + 224;
 	char *x = challenge_secret + 128;
 	do {
 		// Chose a random 512-bit x
@@ -190,22 +255,62 @@ int tabby_password_challenge(tabby_server *S, const char password_verifier[80], 
 		snowshoe_mod_q(x, x);
 
 		// Retry while resulting point is invalid
-	} while (snowshoe_elligator_encrypt(x, E, challenge));
+	} while (snowshoe_elligator_encrypt(x, E, Xp));
 
 	// Store V
 	char *V = challenge_secret + 160;
 	memcpy(V, password_verifier, 64);
 
-	// Add salt to challenge
-	memcpy(challenge + 64, password_verifier + 64, PBKDF_SALT_SIZE);
+	// Generate challenge
+	const char *salt = password_verifier + 64;
+	memcpy(challenge, Xp, 64);
+	memcpy(challenge + 64, salt, PBKDF_SALT_SIZE);
 
 	return 0;
 }
+
+/*
+	tabby_password_client_proof(
+		C,
+		username, username_len,
+		realm, realm_len,
+		password, password_len,
+		challenge [IN],
+		server_public [IN],
+		server_verifier [OUT],
+		client_proof [OUT])
+
+	Now that the server has provided a challenge the client must answer with
+	a proof of knowledge of the password.  This function will hash the password
+	similar to tabby_password(), except that the salt is provided as part of
+	the server's challenge.
+
+	Packed data formats:
+
+		Inputs:
+
+			challenge			[80 bytes]
+				X'				[64 bytes]
+				Salt			[16 bytes]
+
+			server_public		[64 bytes]
+				SP = Server's Public Key
+
+		Outputs:
+
+			client_proof		[96 bytes]
+				Y' = Y + E		[64 bytes]
+				CPROOF			[32 bytes]
+
+			server_verifier		[32 bytes]
+				SPROOF			[32 bytes]
+*/
 
 int tabby_password_client_proof(tabby_client *C, const void *username, int username_len, const void *realm, int realm_len, const void *password, int password_len, const char challenge[80], const char server_public[64], char server_verifier[32], char client_proof[96]) {
 	client_internal *state = (client_internal *)C;
 
 	char E[128 + 64 + 64];
+	blake2b_state B;
 
 	// If invalid input,
 	if (!C || !username || username_len < 1 || !password || password_len < 1 ||
@@ -242,13 +347,12 @@ int tabby_password_client_proof(tabby_client *C, const void *username, int usern
 	}
 
 	const char *Xp = challenge;
-	const char *v = client_secret;
-	char *y = E + 128;
-	char *vy = server_verifier;
-	char *Y = client_proof;
+	char *Yp = client_proof;
 	char *Z = E + 128;
+	char *a = server_verifier;
 	do {
 		// Chose a random 512-bit y
+		char *y = E + 128;
 		if (cymric_random(&state->rng, y, 64)) {
 			return -1;
 		}
@@ -257,24 +361,48 @@ int tabby_password_client_proof(tabby_client *C, const void *username, int usern
 		snowshoe_mod_q(y, y);
 
 		// Y' = Y + E
-		if (snowshoe_elligator_encrypt(y, E, Y)) {
+		if (snowshoe_elligator_encrypt(y, E, Yp)) {
 			continue;
 		}
 
-		// vy = v + y (mod q)
-		snowshoe_add_mod_q(v, y, vy);
+		// h = H(X', Y')
+		char *h = E + 128 + 64;
+		if (blake2b_init(&B, 64)) {
+			return -1;
+		}
+		if (blake2b_update(&B, (const u8 *)Xp, 64)) {
+			return -1;
+		}
+		if (blake2b_update(&B, (const u8 *)Yp, 64)) {
+			return -1;
+		}
+		if (blake2b_final(&B, (u8 *)h, 64)) {
+			return -1;
+		}
+
+		// h = h (mod q) for uniform distribution
+		snowshoe_mod_q(h, h);
+
+		// a = vh + y (mod q)
+		const char *v = client_secret;
+		snowshoe_mul_mod_q(v, h, y, a);
 
 		// X = (X' - E)
-		// Z = (v + y)X
-	} while (snowshoe_elligator_secret(vy, Xp, E, 0, Z));
+		// Z = aX
+	} while (snowshoe_elligator_secret(a, Xp, E, 0, 0, Z));
 
 	// PROOF = BLAKE2(E, SP, Z)
 	char *proof = E + 128 + 64;
-	blake2b_state B;
 	if (blake2b_init(&B, 64)) {
 		return -1;
 	}
 	if (blake2b_update(&B, (const u8 *)E, 128)) {
+		return -1;
+	}
+	if (blake2b_update(&B, (const u8 *)Xp, 64)) {
+		return -1;
+	}
+	if (blake2b_update(&B, (const u8 *)Yp, 64)) {
 		return -1;
 	}
 	if (blake2b_update(&B, (const u8 *)server_public, 64)) {
@@ -298,33 +426,92 @@ int tabby_password_client_proof(tabby_client *C, const void *username, int usern
 	return 0;
 }
 
-int tabby_password_server_proof(tabby_server *S, const char client_proof[96], const char challenge_secret[224], char server_proof[32]) {
+/*
+	tabby_password_server_proof(
+		S,
+		client_proof [IN],
+		challenge_secret [IN],
+		server_proof [OUT])
+
+	After the client provides proof, the server uses this function to check
+	the proof and to generate its own proof of knowledge.
+
+	Packed data formats:
+
+		Inputs:
+
+			client_proof		[96 bytes]
+				Y' = Y + E		[64 bytes]
+				CPROOF			[32 bytes]
+
+			challenge_secret	[288 bytes]
+				E (extended)	[128 bytes]
+				x				[32 bytes]
+				V				[64 bytes]
+				X' = X + E		[64 bytes]
+
+		Outputs:
+
+			server_proof		[32 bytes]
+				SPROOF			[32 bytes]
+*/
+
+int tabby_password_server_proof(tabby_server *S, const char client_proof[96], const char challenge_secret[288], char server_proof[32]) {
 	server_internal *state = (server_internal *)S;
 
 	char Z[64];
+	blake2b_state B;
 
 	// If invalid input,
 	if (!S || !client_proof || !challenge_secret || !server_proof) {
 		return -1;
 	}
 
-	// Y = Y' - E
-	// Z = x(V + Y)
+	// h = H(X', Y')
+	const char *Xp = challenge_secret + 224;
 	const char *Yp = client_proof;
-	const char *E = challenge_secret;
+	char *h = Z;
+	if (blake2b_init(&B, 64)) {
+		return -1;
+	}
+	if (blake2b_update(&B, (const u8 *)Xp, 64)) {
+		return -1;
+	}
+	if (blake2b_update(&B, (const u8 *)Yp, 64)) {
+		return -1;
+	}
+	if (blake2b_final(&B, (u8 *)h, 64)) {
+		return -1;
+	}
+
+	// h = h (mod q) for uniform distribution
+	snowshoe_mod_q(h, h);
+
+	// b = xh (mod q)
 	const char *x = challenge_secret + 128;
+	char *b = Z;
+	snowshoe_mul_mod_q(x, h, 0, b);
+
+	// Y = Y' - E
+	// Z = xY + bV
+	const char *E = challenge_secret;
 	const char *V = challenge_secret + 160;
-	if (snowshoe_elligator_secret(x, Yp, E, V, Z)) {
+	if (snowshoe_elligator_secret(x, Yp, E, b, V, Z)) {
 		return -1;
 	}
 
 	// PROOF = BLAKE2(E, SP, Z)
 	char *proof = Z;
-	blake2b_state B;
 	if (blake2b_init(&B, 64)) {
 		return -1;
 	}
 	if (blake2b_update(&B, (const u8 *)E, 128)) {
+		return -1;
+	}
+	if (blake2b_update(&B, (const u8 *)Xp, 64)) {
+		return -1;
+	}
+	if (blake2b_update(&B, (const u8 *)Yp, 64)) {
 		return -1;
 	}
 	if (blake2b_update(&B, (const u8 *)state->public_key, 64)) {

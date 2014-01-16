@@ -33,7 +33,7 @@
 extern "C" {
 #endif
 
-#define TABBY_VERSION 3
+#define TABBY_VERSION 4
 
 /*
  * Verify binary compatibility with the Tabby API on startup.
@@ -229,7 +229,7 @@ extern int tabby_password(tabby_client *C, const void *username, int username_le
  * Returns 0 on success.
  * Returns non-zero if the input data is invalid.
  */
-extern int tabby_password_challenge(tabby_server *S, const char password_verifier[80], char challenge_secret[224], char challenge[80]);
+extern int tabby_password_challenge(tabby_server *S, const char password_verifier[80], char challenge_secret[288], char challenge[80]);
 
 /*
  * Respond to a password challenge from server
@@ -249,7 +249,7 @@ extern int tabby_password_client_proof(tabby_client *C, const void *username, in
  * Returns 0 on success.
  * Returns non-zero if the client's proof was invalid.
  */
-extern int tabby_password_server_proof(tabby_server *S, const char client_proof[96], const char challenge_secret[224], char server_proof[32]);
+extern int tabby_password_server_proof(tabby_server *S, const char client_proof[96], const char challenge_secret[288], char server_proof[32]);
 
 /*
  * Verify a password proof from server

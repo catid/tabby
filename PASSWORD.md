@@ -60,7 +60,7 @@ v,V, salt = tabby_password(username, realm, password):
 	v = PBKDF(salt, pw) [512 bits, 64 bytes]
 	v = v (mod q) [using Snowshoe, q = prime subgroup order]
 	Repeat from the top if v = 0.
-	V = vG [using Snowshoe, 72 bytes]
+	V = vG [using Snowshoe, 64 bytes]
 ~~~
 
 
@@ -92,6 +92,8 @@ Server Online Processing:
 	X' = snowshoe_elligator_encrypt(x, E):
 		X = xG
 		X' = X + E
+
+	Store X', E, x, V
 ~~~
 
 Server transmits:
@@ -113,12 +115,17 @@ Client Online Processing:
 		Y = yG
 		Y' = Y + E
 
-	Z = snowshoe_elligator_secret(v+y, X', E):
-		X = X' - E
-		Z = (v + y)X
+	h = H(X', Y')
+	a = y + vh (mod q)
 
-	SPROOF, CPROOF = H(E, server_public_key, Z):
+	Z = snowshoe_elligator_secret(a, X', E):
+		X = X' - E
+		Z = aX
+
+	SPROOF, CPROOF = H(E, X', Y', server_public_key, Z):
 		CPROOF is low 32 bytes, SPROOF is high 32 bytes.
+
+	Store SPROOF
 ~~~
 
 Client transmits:
@@ -130,11 +137,15 @@ c2s Y'[64 bytes], CPROOF[32 bytes]
 Server Online Processing:
 
 ~~~
-	Z = snowshoe_elligator_secret(x, Y', V, E):
-		Y = Y' - E
-		Z = x(Y + V)
+	h = H(X', Y')
+	b = xh (mod q)
 
-	SPROOF, CPROOF = H(E, server_public_key, Z):
+	Z = snowshoe_elligator_secret(x, Y', b, V, E):
+		Y = Y' - E
+		Z = xY + bV
+
+	SPROOF, CPROOF = H(E, X', Y', server_public_key, Z):
+		CPROOF is low 32 bytes, SPROOF is high 32 bytes.
 
 	Verify CPROOF.  Disconnect on proof mismatch.
 ~~~
@@ -162,6 +173,10 @@ There is a flaw in this protocol that leads to an offline dictionary attack from
 Another area to pay attention to is how it is incorporated into the Tabby protocol.  I envision it being nested within a PKI-protected authenticated encryption scheme to allow for deniability, so that the client's username is not sent in the clear.  The issue that can happen is that if the server's public key is self-signed, then MitM is possible, and the attacker can relay the password protocol through to the real server to trick the user into thinking the attacker knows the password.  To prevent this, the server's public key makes an appearance in the final Z hash.  If the client is expecting the MitM public key, then the server will not verify correctly.
 
 Sadly, deniability is lost when the server's public key is self-signed because a MitM would be able to watch the exchange up until the final server proof message, which would tell the MitM that the user knows his own password.  So if the server's public key is not known ahead of time, an active attacker can determine if the client owns the account, despite that the client will discover the subterfuge.
+
+The introduction of `h` is important to maintain the augmented property against specially crafted values of `Y'`.  In an earlier version of this protocol, the server calculated `Z = x(Y'-E+V)` and the client with knowledge of `V` could send `Y' = Y + E - V`, which would make the server evaluate `Z = x(Y+E-V-E+V) = xY`, so the client just needs to calculate `Z = yX` and does not need to know `v`.
+
+SPAKE2+ by Dan Boneh fixed this issue by computing `Z1 = xY` and `Z2 = xV` separately.  To fix the issue more efficiently, the Tabby password authentication server computes `Z = xY + xhV`, which can be computed simultaneously in less time.  To attack this construction, the value for `h` can be selected through brute force by the client via the choice of `Y'` to choose `h` such that `Y' = Y + E - hV`, but this would have a higher difficulty than just brute-forcing a 256-bit hash and would need to be done in real-time since `h` incorporates the per-session random value `X'` from the server, so the attack is impractical.
 
 Some modifications to the protocol can be discussed:
 
