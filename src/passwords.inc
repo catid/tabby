@@ -536,6 +536,15 @@ int tabby_password_server_proof(tabby_server *S, const char client_proof[96], co
 	return 0;
 }
 
+/*
+	tabby_password_check_server(
+		server_verifier [IN]
+		server_proof [IN])
+
+	The server sent its proof of knowledge and now the client calls this function
+	to verify it.  This function only has to do a constant-time memory comparison.
+*/
+
 int tabby_password_check_server(const char server_verifier[32], const char server_proof[32]) {
 	// If invalid input,
 	if (!server_verifier || !server_proof) {
