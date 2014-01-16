@@ -113,11 +113,12 @@ Client Online Processing:
 		Y = yG
 		Y' = Y + E
 
-	Z = snowshoe_elligator_secret(v+y, X', E):
+	Z1,Z2 = snowshoe_elligator_secret(v, X', E):
 		X = X' - E
-		Z = (v + y)X
+		Z1 = vX
+		Z2 = yX
 
-	SPROOF, CPROOF = H(E, server_public_key, Z):
+	SPROOF, CPROOF = H(E, server_public_key, Z1, Z2, V):
 		CPROOF is low 32 bytes, SPROOF is high 32 bytes.
 ~~~
 
@@ -130,11 +131,12 @@ c2s Y'[64 bytes], CPROOF[32 bytes]
 Server Online Processing:
 
 ~~~
-	Z = snowshoe_elligator_secret(x, Y', V, E):
+	Z1,Z2 = snowshoe_elligator_secret(x, Y', E):
 		Y = Y' - E
-		Z = x(Y + V)
+		Z1 = xV
+		Z2 = xY
 
-	SPROOF, CPROOF = H(E, server_public_key, Z):
+	SPROOF, CPROOF = H(E, server_public_key, Z1, Z2, V):
 
 	Verify CPROOF.  Disconnect on proof mismatch.
 ~~~
