@@ -242,7 +242,8 @@ int tabby_password_challenge(tabby_server *S, const char password_verifier[80], 
 		return -1;
 	}
 
-	// X' = xG + E
+	// X = xG
+	// X' = X + E
 	char *Xp = challenge_secret + 224;
 	char *x = challenge_secret + 128;
 	do {
@@ -309,7 +310,7 @@ int tabby_password_challenge(tabby_server *S, const char password_verifier[80], 
 int tabby_password_client_proof(tabby_client *C, const void *username, int username_len, const void *realm, int realm_len, const void *password, int password_len, const char challenge[80], const char server_public[64], char server_verifier[32], char client_proof[96]) {
 	client_internal *state = (client_internal *)C;
 
-	char E[128 + 64 + 64];
+	char E[128 + 64 + 64 + 64];
 	blake2b_state B;
 
 	// If invalid input,
@@ -320,7 +321,7 @@ int tabby_password_client_proof(tabby_client *C, const void *username, int usern
 
 	// Generate client secret and password verifier from account data
 	const char *salt = challenge + 64;
-	char *client_secret = E + 128 + 64;
+	char *v = E + 128 + 64;
 	char *password_verifier = E;
 
 	// Note that the "recoverable" error should never happen here, so any error is a failure
@@ -328,7 +329,7 @@ int tabby_password_client_proof(tabby_client *C, const void *username, int usern
 					username, username_len,
 					realm, realm_len, // These can be 0 to skip the realm hash
 					password, password_len,
-					client_secret, password_verifier)) {
+					v, password_verifier)) {
 		return -1;
 	}
 
@@ -360,13 +361,14 @@ int tabby_password_client_proof(tabby_client *C, const void *username, int usern
 		// y = y (mod q) for uniform distribution
 		snowshoe_mod_q(y, y);
 
+		// Y = yG
 		// Y' = Y + E
 		if (snowshoe_elligator_encrypt(y, E, Yp)) {
 			continue;
 		}
 
 		// h = H(X', Y')
-		char *h = E + 128 + 64;
+		char *h = E + 256;
 		if (blake2b_init(&B, 64)) {
 			return -1;
 		}
@@ -384,7 +386,6 @@ int tabby_password_client_proof(tabby_client *C, const void *username, int usern
 		snowshoe_mod_q(h, h);
 
 		// a = vh + y (mod q)
-		const char *v = client_secret;
 		snowshoe_mul_mod_q(v, h, y, a);
 
 		// X = (X' - E)
