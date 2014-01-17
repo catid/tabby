@@ -1,4 +1,7 @@
 ## Tabby Portable Build
+#### Strong, Fast, and Portable Cryptographic Signatures, Handshakes, and Password Authentication
+
+See the full documentation at [https://github.com/catid/tabby](https://github.com/catid/tabby).
 
 #### Quick Setup
 
