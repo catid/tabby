@@ -83,7 +83,8 @@ Verify binary API compatibility on startup:
 
 ~~~
 	if (tabby_init()) {
-		throw "Buildtime failure: Wrong tabby static library";
+		// Buildtime failure: Wrong tabby static library
+		exit(1);
 	}
 ~~~
 
