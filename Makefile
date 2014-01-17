@@ -36,15 +36,6 @@ debug : LIBNAME = libtabby_debug.a
 debug : library
 
 
-# Library.ARM target
-
-library.arm : CCPP = /Volumes/casedisk/prefix/bin/arm-unknown-eabi-g++
-library.arm : CPLUS_INCLUDE_PATH = /Volumes/casedisk/prefix/arm-unknown-eabi/include
-library.arm : CC = /Volumes/casedisk/prefix/bin/arm-unknown-eabi-gcc
-library.arm : C_INCLUDE_PATH = /Volumes/casedisk/prefix/arm-unknown-eabi/include
-library.arm : library
-
-
 # Library target
 
 library : CFLAGS += $(OPTFLAGS)
@@ -57,6 +48,14 @@ library : $(tabby_o)
 test : CFLAGS += -DUNIT_TEST $(OPTFLAGS)
 test : clean $(tabby_test_o) library
 	$(CCPP) $(tabby_test_o) $(LIBS) -L./bin -ltabby -L./snowshoe/bin -L./cymric/bin -o test
+	./test
+
+
+# tester executables for mobile version
+
+test-mobile : CFLAGS += -DUNIT_TEST $(OPTFLAGS)
+test-mobile : clean $(tabby_test_o)
+	$(CCPP) $(tabby_test_o) -L./tabby-mobile -ltabby -o test
 	./test
 
 

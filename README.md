@@ -26,6 +26,13 @@ encrypt messages for transmission over TCP/UDP sockets,
 see the [Calico project](https://github.com/catid/calico/).
 
 
+##### Building: Quick Setup
+
+The `tabby-mobile` directory contains an easy-to-import set to C code that also
+builds properly for mobile devices.  In a pinch you can use this code for
+desktops, though it will tend to run about 1 microsecond slower.
+
+
 ##### Building: Mac/Linux
 
 To build the static library, install command-line Xcode tools and simply run the make script:

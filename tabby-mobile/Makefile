@@ -6,7 +6,7 @@
 #OPTFLAGS = -O3 -fomit-frame-pointer -funroll-loops
 CCPP = clang++ -m64
 CC = clang -m64
-OPTFLAGS = -O3
+OPTFLAGS = -O4
 DBGFLAGS = -g -O0 -DDEBUG
 CFLAGS = -Wall -fstrict-aliasing -I.
 LIBNAME = libtabby.a
@@ -15,7 +15,8 @@ LIBNAME = libtabby.a
 # Object files
 
 tabby_o = tabby.o SecureErase.o SecureEqual.o lyra.o sponge.o snowshoe.o \
-		  Clock.o EndianNeutral.o blake2b-ref.o chacha.o chacha_blocks_ref.o
+		  Clock.o EndianNeutral.o blake2b-ref.o chacha.o chacha_blocks_ref.o \
+		  cymric.o
 
 # Release target (default)
 
@@ -70,6 +71,12 @@ snowshoe.o : snowshoe.cpp
 
 blake2b-ref.o : blake2b-ref.c
 	$(CC) $(CFLAGS) -c blake2b-ref.c
+
+
+# Cymric objects
+
+cymric.o : cymric.cpp
+	$(CCPP) $(CFLAGS) -c cymric.cpp
 
 
 # ChaCha objects
