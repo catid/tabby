@@ -229,7 +229,7 @@ This can be done by a special tool or as part of the client application.
 The result should be stored in the server database so that the server can verify logins.
 
 ~~~
-	char password_verifier[72];
+	char password_verifier[80];
 
 	if (tabby_password(&c,
 					   username, strlen(username),
@@ -251,7 +251,7 @@ challenge to the client.  This also generates a temporary secret that is used to
 the client's response to the challenge.  This is a fast operation (~0.065 ms on a laptop).
 
 ~~~
-	char challenge_secret[224], challenge[72];
+	char challenge_secret[288], challenge[80];
 
 	if (tabby_password_challenge(&s,
 								 password_verifier,
