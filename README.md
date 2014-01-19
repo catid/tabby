@@ -29,7 +29,7 @@ see the [Calico project](https://github.com/catid/calico/).
 ##### Building: Quick Setup
 
 The [tabby-mobile](https://github.com/catid/tabby/tree/master/tabby-mobile)
-directory contains an easy-to-import set to C code that also
+directory contains an easy-to-import set of C code that also
 builds properly for mobile devices.  In a pinch you can use this code for
 desktops, though it will tend to run about 1 microsecond slower.
 
