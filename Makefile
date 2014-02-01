@@ -11,7 +11,7 @@ DBGFLAGS = -g -O0 -DDEBUG
 CFLAGS = -Wall -fstrict-aliasing -I./blake2/sse -I./libcat -I./include \
 		 -I./snowshoe/include -I./cymric/include -I./lyra
 LIBNAME = bin/libtabby.a
-LIBS = -lsnowshoe -lcymric
+LIBS = -L./snowshoe/bin -lsnowshoe -L./cymric/bin -lcymric
 
 
 # Object files
@@ -26,6 +26,9 @@ tabby_test_o = tabby_test.o $(shared_test_o)
 # Release target (default)
 
 release : CFLAGS += $(OPTFLAGS)
+release :
+	cd cymric; make release
+	cd snowshoe; make release
 release : library
 
 
@@ -46,8 +49,8 @@ library : $(tabby_o)
 # tester executables
 
 test : CFLAGS += -DUNIT_TEST $(OPTFLAGS)
-test : clean $(tabby_test_o) library
-	$(CCPP) $(tabby_test_o) $(LIBS) -L./bin -ltabby -L./snowshoe/bin -L./cymric/bin -o test
+test : clean $(tabby_test_o) release
+	$(CCPP) $(tabby_test_o) -L./bin -ltabby $(LIBS) -o test
 	./test
 
 
@@ -97,6 +100,8 @@ tabby_test.o : tests/tabby_test.cpp
 .PHONY : clean
 
 clean :
-	git submodule update --init
-	-rm test libtabby.a $(shared_test_o) $(tabby_test_o) $(tabby_o)
+	git submodule update --init --recursive
+	-rm test bin/libtabby.a $(shared_test_o) $(tabby_test_o) $(tabby_o)
+	cd cymric; make clean
+	cd snowshoe; make clean
 
