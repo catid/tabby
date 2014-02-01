@@ -1,12 +1,13 @@
 # Change your compiler settings here
 
-# Clang seems to produce faster code
+# Clang seems to produce faster code on Mac
+# GCC produces faster code on Linux
 #CCPP = g++
 #CC = gcc
 #OPTFLAGS = -O3 -fomit-frame-pointer -funroll-loops
 CCPP = clang++ -m64
 CC = clang -m64
-OPTFLAGS = -O3
+OPTFLAGS = -O4
 DBGFLAGS = -g -O0 -DDEBUG
 CFLAGS = -Wall -fstrict-aliasing -I./blake2/sse -I./libcat -I./include \
 		 -I./snowshoe/include -I./cymric/include -I./lyra
@@ -80,7 +81,7 @@ tabby.o : src/tabby.cpp
 	$(CCPP) $(CFLAGS) -c src/tabby.cpp
 
 blake2b.o : blake2/sse/blake2b.c
-	$(CC) $(CFLAGS) -c blake2/sse/blake2b.c
+	$(CC) $(CFLAGS) -std=c99 -c blake2/sse/blake2b.c
 
 lyra.o : lyra/lyra.c
 	$(CC) $(CFLAGS) -c lyra/lyra.c
