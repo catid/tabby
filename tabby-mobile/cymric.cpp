@@ -174,34 +174,41 @@ static u32 unix_gettid() {
 
 #ifdef CYMRIC_DEV_RANDOM
 
-static bool read_file(const char *path, u8 *buffer, int bytes) {
-	int remaining = bytes, retries = 100;
+static int read_file(const char *path, u8 *buffer, int bytes) {
+	int completed = 0, retries = 100;
 
 	do {
-		int len = 0;
+		int len = bytes - completed;
 
-		// Attempt to read the file
-		int random_fd = open(path, O_RDONLY);
-		if (random_fd >= 0) {
-			len = read(random_fd, buffer, remaining);
-			close(random_fd);
+		// Attempt to open the file
+		int fd = open(path, O_RDONLY);
+		if (fd >= 0) {
+			// Set non-blocking mode
+			int flags = fcntl(fd, F_GETFL, 0);
+			fcntl(fd, F_SETFL, flags | O_NONBLOCK);
+
+			// Launch read request and close file
+			len = read(fd, buffer, len);
+			close(fd);
 		}
 
-		// If read request failed,
+		// If read request failed (ie. blocking),
 		if (len <= 0) {
 			if (--retries >= 0) {
 				continue;
 			} else {
+				// Give up
 				break;
 			}
 		}
 
 		// Subtract off the read byte count from request size
-		remaining -= len;
+		completed += len;
 		buffer += len;
-	} while (remaining > 0);
+	} while (completed < bytes);
 
-	return remaining <= 0;
+	// Return number of bytes completed
+	return completed;
 }
 
 #endif // CYMRIC_DEV_RANDOM
@@ -224,7 +231,12 @@ static u32 get_counter() {
 
 static volatile bool m_is_initialized = false;
 
+// Decide how many bytes to keep for scratch space
+#ifdef CYMRIC_WINMEM
+static const int SEED_SCRATCH_BYTES = 64;
+#else
 static const int SEED_SCRATCH_BYTES = 32;
+#endif
 
 
 #ifdef __cplusplus
@@ -309,12 +321,14 @@ int cymric_seed(cymric_rng *R, const void *seed, int bytes) {
 		// which is often implemented as a separate pool that will actually
 		// provide additional entropy over /dev/random even when that device
 		// is blocking waiting for more.
-		if (!read_file(CYMRIC_RAND_FILE, scratch, 20)) {
+		int devrand_bytes = read_file(CYMRIC_RAND_FILE, scratch, 20);
+
+		// Fill in the rest with /dev/urandom
+		int min_bytes = 32 - devrand_bytes;
+		if (read_file(CYMRIC_URAND_FILE, scratch + devrand_bytes, min_bytes) < min_bytes) {
 			return -1;
 		}
-		if (!read_file(CYMRIC_URAND_FILE, scratch + 20, 12)) {
-			return -1;
-		}
+
 		if (blake2b_update(&state, scratch, 32)) {
 			return -1;
 		}
@@ -487,7 +501,7 @@ int cymric_seed(cymric_rng *R, const void *seed, int bytes) {
 	}
 
 	// Erase BLAKE2 state and scratch
-	CAT_SECURE_OBJCLR(state);
+	CAT_SECURE_OBJCLR(state.buf);
 	CAT_SECURE_OBJCLR(scratch);
 
 	// Sanity check for compilation
@@ -588,10 +602,20 @@ int cymric_random(cymric_rng *R, void *buffer, int bytes) {
 	}
 #endif
 
+	blake2b_state state;
+
 	// Iterate the hash to erase the ChaCha20 key material
-	if (blake2b((u8 *)R->internal, R->internal, 0, 64, 64, 0)) {
+	if (blake2b_init(&state, 64)) {
 		return -1;
 	}
+	if (blake2b_update(&state, (const u8 *)R->internal, 64)) {
+		return -1;
+	}
+	if (blake2b_final(&state, (u8 *)R->internal, 64)) {
+		return -1;
+	}
+
+	CAT_SECURE_OBJCLR(state.buf);
 
 	return 0;
 }
@@ -634,7 +658,7 @@ int cymric_derive(cymric_rng *R, cymric_rng *source, const void *seed, int bytes
 	}
 
 	// Erase BLAKE2 state and key
-	CAT_SECURE_OBJCLR(state);
+	CAT_SECURE_OBJCLR(state.buf);
 	CAT_SECURE_OBJCLR(key);
 
 	// Indicate state is seeded
