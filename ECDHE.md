@@ -4,12 +4,13 @@ The Tabby Elliptic Curve Diffie-Hellman Ephemeral Key Agreement Protocol offers
 perfect forward secrecy through the use of ephemeral keys on the server and the
 client.
 
-As a hand-waving argument for security, Tabby EC-DHE runs two EC-DH key agreement
-protocols, one based on the server's long-term secret, and another based on an
-ephemeral secret, and sums the results into one key.  It avoids exploits based on
-the summation math by multiplying one of the keys by an ephemeral hash value
-agreed upon by both parties, similar to how Schnorr signatures protect the
-long-term secret of the server, except that the sum is not revealed by Tabby.
+Roughly, Tabby EC-DHE runs two EC-DH key agreement protocols, one based on the
+server's long-term secret, and another based on an ephemeral secret, and sums
+the results into one key.  It avoids exploits based on the summation math by
+multiplying one of the keys by an ephemeral hash value agreed upon by both
+parties, similar to how Schnorr signatures protect the long-term secret of the
+server, except that the sum is not revealed by Tabby.
+
 For detailed security arguments read more below.
 
 
