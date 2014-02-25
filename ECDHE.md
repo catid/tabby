@@ -102,6 +102,12 @@ operation on each side.  And then the ephemeral public key would need to be used
 in a second EC-DH operation to arrive at the session key.  So this type of
 scheme is twice as slow as Tabby, which only requires one on the server.
 
+Tabby is using the same ephemeral public key on the server for multiple
+connections, which is rekeyed at the rate selected by the user of the library.
+The `tabby_server_rekey` function is called by the user to rekey.  This rekeying
+is essential to future secrecy.  It is designed to run completely in a separate
+thread so there is no lag spike on random connection attempts.
+
 ##### Client Cost of Tabby
 
 The client needs to generate a key, which takes roughly half the time of the
@@ -135,8 +141,9 @@ in constant-time with regular execution and memory access patterns.  This
 prevents leaking the information through an execution time or cache access time
 side-channel [4].
 
-However Tabby is still vulnerable to SPA attacks, since Snowshoe does not
-have protection against SPA attacks in constructing its mask for table lookup.
+However Tabby is still vulnerable to power analysis (PA) attacks, since Snowshoe
+does not have protection against SPA attacks in constructing its mask for table
+lookups.
 
 Client sends to server:
 
@@ -222,6 +229,16 @@ the public information hash H, this proves that:
 
 + (1) the server's transmitted information came from the real server and
 + (2) that this specific client's request is the one that the real server responded to.
+
+##### Ephemeral Key Reuse
+
+Tabby is using the same ephemeral public key on the server for multiple
+connections.  This is different from TLS where a new ephemeral key is chosen
+for each new connection.  However this is not unprecedented; this is a new
+approach that improves on TLS.  For example the Google QUIC encryption spec
+states that it reuses ephemeral keys for multiple connections.  And Bernstein's
+MinimaLT does also.  So there are at least two well known cryptographers who
+agree that reusing ephemeral keys is a good idea.
 
 
 #### Security Claims
