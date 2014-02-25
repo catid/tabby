@@ -240,6 +240,16 @@ states that it reuses ephemeral keys for multiple connections.  And Bernstein's
 MinimaLT does also.  So there are at least two well known cryptographers who
 agree that reusing ephemeral keys is a good idea.
 
+There is definitely a danger in reusing ephemeral keys if the input points are
+not validated.  For instance if the points were not verified to be on the curve
+then it would be possible to mount the same attack described in [5].  The attack
+described in that paper against HMQV requires that the initiator's public point
+belongs to a curve of smooth order.  However since the input points are
+validated, this attack does not succeed, and it is noted in the paper explicitly
+in section 2.3 that for the case of elliptic curve groups the attack is thwarted
+by checking that the input point is on the curve.  Note that if input points
+were not checked there would be many other attacks that could be launched.
+
 
 #### Security Claims
 
@@ -359,4 +369,7 @@ Nice introduction to what key exchange protocols are all about.
 
 ##### [4] ["Flush+Reload: a High Resolution, Low Noise, L3 Cache Side-Channel Attack" (Yarom Falkner 2013)](https://eprint.iacr.org/2013/448.pdf)
 Modern side-channel attack discussion.
+
+##### [5] ["On Reusing Ephemeral Keys in Diffie-Hellman Key Agreement Protocols" (Menezes Ustaoglu 2004)](http://www.math.uwaterloo.ca/~ajmeneze/publications/ephemeral.pdf)
+Discusses dangers of reusing ephemeral keys for DH in similar protocol HMQV.
 
