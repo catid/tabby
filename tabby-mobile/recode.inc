@@ -107,17 +107,27 @@ static CAT_INLINE void ec_gen_table_2(const ecpt &a, const ecpt &b, bool z1, ecp
  */
 
 static CAT_INLINE u32 ec_recode_scalars_2(ufp &a, ufp &b, const int len) {
-	u32 lsb = ((u32)a.i[0] & 1) ^ 1;
-	a.w -= lsb;
-	a.w >>= 1;
-	a.w |= (u128)1 << (len - 1);
+	u32 lsb = ((u32)u128_low(a.w) & 1) ^ 1;
 
-	const u128 an = ~a.w;
-	u128 mask = 1;
+	u128_sub(a.w, (u64)lsb);
+
+	u128_rshift(a.w, 1);
+
+	u128_set_bit(a.w, len - 1);
+
+	const u128 an = u128_not(a.w);
+
+	u128 mask;
+	u128_set(mask, 1);
+
 	for (int ii = 1; ii < len; ++ii) {
-		const u128 anmask = an & mask;
-		b.w += (b.w & anmask) << 1;
-		mask <<= 1;
+		u128 anmask = u128_and(b.w, u128_and(an, mask));
+
+		u128_lshift(anmask, 1);
+
+		u128_add(b.w, anmask);
+
+		u128_lshift(mask, 1);
 	}
 
 	return lsb;
@@ -128,15 +138,15 @@ static CAT_INLINE u32 ec_recode_scalars_2(ufp &a, ufp &b, const int len) {
  */
 
 static void ec_table_select_2(const ecpt *table, const ufp &a, const ufp &b, const int index, const bool constant_time, ecpt &r) {
-	u32 bits = (u32)(a.w >> index);
+	u32 bits = u128_get_bits(a.w, index);
 	u32 k = ((bits ^ (bits >> 1)) & 1) << 2;
-	k |= (u32)(b.w >> index) & 3;
+	k |= u128_get_bits(b.w, index) & 3;
 
 	// If constant time requested,
 	if (constant_time) {
 		ec_zero(r);
 
-#ifdef CAT_HAS_VECTOR_EXTENSIONS
+#ifdef CAT_SNOWSHOE_VECTOR_OPT
 
 		const vec_ecpt *tp = (const vec_ecpt *)table;
 		vec_ecpt *rp = (vec_ecpt *)&r;
@@ -205,19 +215,35 @@ static void ec_gen_table_4(const ecpt &a, const ecpt &b, bool pz1, const ecpt &c
  */
 
 static CAT_INLINE u32 ec_recode_scalars_4(ufp &a, ufp &b, ufp &c, ufp &d, const int len) {
-	u32 lsb = ((u32)a.i[0] & 1) ^ 1;
-	a.w -= lsb;
-	a.w >>= 1;
-	a.w |= (u128)1 << (len - 1);
+	u32 lsb = ((u32)u128_low(a.w) & 1) ^ 1;
 
-	const u128 an = ~a.w;
-	u128 mask = 1;
+	u128_sub(a.w, (u64)lsb);
+
+	u128_rshift(a.w, 1);
+
+	u128_set_bit(a.w, len - 1);
+
+	const u128 an = u128_not(a.w);
+
+	u128 mask;
+	u128_set(mask, 1);
+
 	for (int ii = 1; ii < len; ++ii) {
-		const u128 anmask = an & mask;
-		b.w += (b.w & anmask) << 1;
-		c.w += (c.w & anmask) << 1;
-		d.w += (d.w & anmask) << 1;
-		mask <<= 1;
+		const u128 anmask = u128_and(an, mask);
+
+		u128 b_mask = u128_and(b.w, anmask);
+		u128_lshift(b_mask, 1);
+		u128_add(b.w, b_mask);
+
+		u128 c_mask = u128_and(c.w, anmask);
+		u128_lshift(c_mask, 1);
+		u128_add(c.w, c_mask);
+
+		u128 d_mask = u128_and(d.w, anmask);
+		u128_lshift(d_mask, 1);
+		u128_add(d.w, d_mask);
+
+		u128_lshift(mask, 1);
 	}
 
 	return lsb;
@@ -228,13 +254,13 @@ static CAT_INLINE u32 ec_recode_scalars_4(ufp &a, ufp &b, ufp &c, ufp &d, const 
  */
 
 static CAT_INLINE void ec_table_select_4(const ecpt *table, const ufp &a, const ufp &b, const ufp &c, const ufp &d, const int index, ecpt &r) {
-	int k = ((u32)(b.w >> index) & 1);
-	k |= ((u32)(c.w >> index) & 1) << 1;
-	k |= ((u32)(d.w >> index) & 1) << 2;
+	int k = u128_get_bits(b.w, index) & 1;
+	k |= (u128_get_bits(c.w, index) & 1) << 1;
+	k |= (u128_get_bits(d.w, index) & 1) << 2;
 
 	ec_zero(r);
 
-#ifdef CAT_HAS_VECTOR_EXTENSIONS
+#ifdef CAT_SNOWSHOE_VECTOR_OPT
 
 	const vec_ecpt *tp = (const vec_ecpt *)table;
 	vec_ecpt *rp = (vec_ecpt *)&r;
@@ -258,7 +284,7 @@ static CAT_INLINE void ec_table_select_4(const ecpt *table, const ufp &a, const 
 
 #endif
 
-	ec_cond_neg_inplace(((a.w >> index) & 1) ^ 1, r);
+	ec_cond_neg_inplace((u128_get_bits(a.w, index) & 1) ^ 1, r);
 }
 
 /*
@@ -366,7 +392,7 @@ static CAT_INLINE u32 ec_recode_scalar_comb_gen(const u64 k[4], u64 b[4]) {
 	b[0] = (b[0] | (low_mask | d_bit)) ^ (d_bit | ((b[0] >> 1) & low_mask));
 
 	// Recode remaining bits as per [1]
-	for (int i = MG_d; i < MG_l; ++i) {
+	for (int i = MG_d; i < MG_l - 1; ++i) {
 		u32 b_imd = (u32)(b[0] >> (i % MG_d));
 		u32 b_i = (u32)(b[i >> 6] >> (i & 63));
 		u32 bit = b_imd & b_i & 1;
@@ -375,14 +401,14 @@ static CAT_INLINE u32 ec_recode_scalar_comb_gen(const u64 k[4], u64 b[4]) {
 		u64 t[4] = {0};
 		t[j >> 6] |= (u64)bit << (j & 63);
 
-		u128 sum = (u128)b[0] + t[0];
-		b[0] = (u64)sum;
-		sum = ((u128)b[1] + t[1]) + (u64)(sum >> 64);
-		b[1] = (u64)sum;
-		sum = ((u128)b[2] + t[2]) + (u64)(sum >> 64);
-		b[2] = (u64)sum;
-		sum = ((u128)b[3] + t[3]) + (u64)(sum >> 64);
-		b[3] = (u64)sum;
+		// b += t
+		u128 sum = u128_sum(b[0], t[0]);
+		b[0] = u128_low(sum);
+		u128_carry_add(sum, b[1], t[1]);
+		b[1] = u128_low(sum);
+		u128_carry_add(sum, b[2], t[2]);
+		b[2] = u128_low(sum);
+		b[3] += u128_high(sum) + t[3];
 	}
 
 	return lsb ^ 1;
@@ -416,7 +442,7 @@ static void ec_table_select_comb_gen(const u64 b[4], const int ii, ecpt r[MG_v])
 
 		ec_zero(p);
 
-#ifdef CAT_HAS_VECTOR_EXTENSIONS
+#ifdef CAT_SNOWSHOE_VECTOR_OPT
 
 		const vec_ecpt_affine *tp = (const vec_ecpt_affine *)GEN_TABLE[vp];
 		vec_ecpt_affine *rp = (vec_ecpt_affine *)&p;
@@ -509,7 +535,7 @@ static u32 ec_recode_scalar_comb_81(const u64 k[4], u64 b[4]) {
 	// for bits 0..(d-1), 0 => -1, 1 => +1
 	b[0] = (b[0] | (low_mask | d_bit)) ^ (d_bit | ((b[0] >> 1) & low_mask));
 
-	for (int i = d; i < l; ++i) {
+	for (int i = d; i < l - 1; ++i) {
 		u32 b_imd = (u32)(b[0] >> (i & 31));
 		u32 b_i = (u32)(b[i >> 6] >> (i & 63));
 		u32 bit = b_imd & b_i & 1;
@@ -518,14 +544,14 @@ static u32 ec_recode_scalar_comb_81(const u64 k[4], u64 b[4]) {
 		u64 t[4] = {0};
 		t[j >> 6] |= (u64)bit << (j & 63);
 
-		u128 sum = (u128)b[0] + t[0];
-		b[0] = (u64)sum;
-		sum = ((u128)b[1] + t[1]) + (u64)(sum >> 64);
-		b[1] = (u64)sum;
-		sum = ((u128)b[2] + t[2]) + (u64)(sum >> 64);
-		b[2] = (u64)sum;
-		sum = ((u128)b[3] + t[3]) + (u64)(sum >> 64);
-		b[3] = (u64)sum;
+		// b += t
+		u128 sum = u128_sum(b[0], t[0]);
+		b[0] = u128_low(sum);
+		u128_carry_add(sum, b[1], t[1]);
+		b[1] = u128_low(sum);
+		u128_carry_add(sum, b[2], t[2]);
+		b[2] = u128_low(sum);
+		b[3] += u128_high(sum) + t[3];
 	}
 
 	return lsb ^ 1;

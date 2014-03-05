@@ -1,0 +1,449 @@
+#if defined(CAT_WORD_64) // 64-bit versions:
+
+
+#if defined(CAT_ASM_ATT) && defined(CAT_ISA_X86) // X86-64:
+
+# define CAT_ADD128(r_hi, r_lo, x_hi, x_lo)	\
+	CAT_ASM_BEGIN							\
+		"addq %3, %1 \n\t"					\
+		"adcq %2, %0"						\
+		: "+r"(r_hi),"+r"(r_lo)				\
+		: "r"(x_hi),"r"(x_lo) : "cc"		\
+	CAT_ASM_END
+
+# define CAT_SUB128(r_hi, r_lo, x_hi, x_lo)	\
+	CAT_ASM_BEGIN							\
+		"subq %3, %1 \n\t"					\
+		"sbbq %2, %0"						\
+		: "+r"(r_hi),"+r"(r_lo)				\
+		: "r"(x_hi),"r"(x_lo) : "cc"		\
+	CAT_ASM_END
+
+# define CAT_SHL128(r_hi, r_lo, shift)	\
+	CAT_ASM_BEGIN						\
+		"shldq %2, %0, %1 \n\t"			\
+		"shlq %0, %0"					\
+		: "+r"(r_hi),"+r"(r_lo)			\
+		: "s"(shift) : "cc"				\
+	CAT_ASM_END
+
+# define CAT_MUL128(r_hi, r_lo, x, y)	\
+	CAT_ASM_BEGIN						\
+		"mulq %3"						\
+		: "=a"(r_lo), "=d"(r_hi)		\
+		: "a"(x), "r"(y) : "cc"			\
+	CAT_ASM_END
+
+
+#elif defined(CAT_ASM_ATT) && defined(CAT_ISA_PPC) // PPC-64:
+
+# define CAT_ADD128(r_hi, r_lo, x_hi, x_lo)	\
+	CAT_ASM_BEGIN							\
+		"addc %1, %1, %3 \n\t"				\
+		"adde %0, %0, %2"					\
+		: "+r"(r_hi),"+r"(r_lo)				\
+		: "r"(x_hi),"r"(x_lo) : "cc"		\
+	CAT_ASM_END
+
+# define CAT_SUB128(r_hi, r_lo, x_hi, x_lo)	\
+	CAT_ASM_BEGIN							\
+		"subc %1, %1, %3 \n\t"				\
+		"sube %0, %0, %2"					\
+		: "+r"(r_hi),"+r"(r_lo)				\
+		: "r"(x_hi),"r"(x_lo) : "cc"		\
+	CAT_ASM_END
+
+# define CAT_MUL128(r_hi, r_lo, x, y)		\
+	{										\
+		u64 __x = x, __y = y;				\
+		r_lo = __x * __y;					\
+		CAT_ASM_BEGIN						\
+			"mulhdu %0, %1, %2"				\
+			: "=r" (r_hi)					\
+			: "r" (__x), "r" (__y) : "cc"	\
+		CAT_ASM_END							\
+	}
+
+
+#elif defined(CAT_COMPILER_MSVC) // MSVC-64:
+
+# define CAT_MUL128(r_hi, r_lo, x, y)	\
+	r_lo = _umul128(x, y, &(r_hi));
+
+# define CAT_SHL128(r_hi, r_lo, shift)			\
+	r_hi = __shiftleft128(r_lo, r_hi, shift);	\
+	r_lo <<= shift;
+
+#endif
+
+#endif // end if 64-bit version
+
+
+#if defined(CAT_COMPILER_MSVC) // MSVC-32:
+# define CAT_MUL64(A, B) __emulu((u32)(A), (u32)(B)) /* slightly faster in ICC */
+#else
+# define CAT_MUL64(A, B) ( (u64)( (u32)(A) ) * (u32)(B) )
+#endif
+
+
+//// Fallback versions based on u64 ////
+
+#if !defined(CAT_ADD128)
+# define CAT_ADD128(r_hi, r_lo, x_hi, x_lo)		\
+	{											\
+		u64 __x_lo = x_lo;						\
+		r_lo += __x_lo;							\
+		r_hi += x_hi;							\
+		r_hi += (r_lo) < __x_lo;				\
+	}
+#endif
+
+#if !defined(CAT_PADD128)
+# define CAT_PADD128(r_hi, r_lo, x)	\
+	{								\
+		u64 __x = x;				\
+		r_lo += __x;				\
+		r_hi += (r_lo) < __x;		\
+	}
+#endif
+
+#if !defined(CAT_SUB128)
+# define CAT_SUB128(r_hi, r_lo, x_hi, x_lo)		\
+	{											\
+		const u64 __r_lo = r_lo;				\
+		const u64 __x_lo = x_lo;				\
+		r_lo -= __x_lo;							\
+		r_hi -= __r_lo < __x_lo;				\
+		r_hi -= x_hi;							\
+	}
+#endif
+
+#if !defined(CAT_PSUB128)
+# define CAT_PSUB128(r_hi, r_lo, x)	\
+	{								\
+		u64 __r = r_lo;				\
+		u64 __x = x;				\
+		r_lo -= __x;				\
+		r_hi -= __r < __x;			\
+	}
+#endif
+
+#if !defined(CAT_SHL128)
+# define CAT_SHL128(r_hi, r_lo, shift)							\
+	{															\
+		if (shift >= 64) {										\
+			r_hi = r_lo << (shift - 64);						\
+			r_lo = 0;											\
+		} else {												\
+			r_hi = (r_hi << shift) | (r_lo >> (64 - shift));	\
+			r_lo <<= shift;										\
+		}														\
+	}
+#endif
+
+
+//// 128-bit API
+
+CAT_INLINE void u128_set(u128 &r, const u64 x)
+{
+	r.i[0] = x;
+	r.i[1] = 0;
+}
+
+CAT_INLINE void u128_set(u128 &r, const u64 low, const u64 high)
+{
+	r.i[0] = low;
+	r.i[1] = high;
+}
+
+CAT_INLINE u128 u128_sum(const u64 x, const u64 y)
+{
+	u128 r;
+
+	r.i[1] = 0;
+	r.i[0] = x;
+
+	CAT_PADD128(r.i[1], r.i[0], y);
+
+	return r;
+}
+
+CAT_INLINE u128 u128_sum(const u128 x, const u64 y)
+{
+	u128 r;
+
+	r.i[1] = x.i[1];
+	r.i[0] = x.i[0];
+
+	CAT_PADD128(r.i[1], r.i[0], y);
+
+	return r;
+}
+
+CAT_INLINE u128 u128_sum(const u128 x, const u128 y)
+{
+	u128 r;
+
+	r.i[1] = x.i[1];
+	r.i[0] = x.i[0];
+
+	CAT_ADD128(r.i[1], r.i[0], y.i[1], y.i[0]);
+
+	return r;
+}
+
+CAT_INLINE void u128_add(u128 &r, const u128 x)
+{
+	CAT_ADD128(r.i[1], r.i[0], x.i[1], x.i[0]);
+}
+
+CAT_INLINE void u128_add(u128 &r, const u64 x)
+{
+	CAT_PADD128(r.i[1], r.i[0], x);
+}
+
+CAT_INLINE void u128_sub(u128 &r, const u128 x)
+{
+	CAT_SUB128(r.i[1], r.i[0], x.i[1], x.i[0]);
+}
+
+CAT_INLINE void u128_sub(u128 &r, const u64 x)
+{
+	CAT_PSUB128(r.i[1], r.i[0], x);
+}
+
+CAT_INLINE void u128_or(u128 &r, const u64 x)
+{
+	r.i[0] |= x;
+}
+
+CAT_INLINE u128 u128_and(const u128 x, const u128 y)
+{
+	u128 r;
+
+	r.i[0] = x.i[0] & y.i[0];
+	r.i[1] = x.i[1] & y.i[1];
+
+	return r;
+}
+
+CAT_INLINE u128 u128_not(const u128 x)
+{
+	u128 r;
+
+	r.i[0] = ~x.i[0];
+	r.i[1] = ~x.i[1];
+
+	return r;
+}
+
+CAT_INLINE void u128_set_bit(u128 &r, int x)
+{
+	r.i[x >> 6] |= (u64)1 << (x & 63);
+}
+
+CAT_INLINE u32 u128_get_bits(const u128 x, int offset)
+{
+	if (offset >= 64) {
+		return (u32)(x.i[1] >> (offset - 64));
+	} else if (offset > 32) {
+		return (u32)((x.i[1] << (64 - offset)) | (x.i[0] >> offset));
+	} else {
+		return (u32)(x.i[0] >> offset);
+	}
+}
+
+CAT_INLINE u128 u128_diff(const u64 x, const u64 y)
+{
+	u128 r;
+
+	r.i[1] = 0;
+	r.i[0] = x;
+
+	CAT_PSUB128(r.i[1], r.i[0], y);
+
+	return r;
+}
+
+CAT_INLINE u128 u128_diff(const u128 x, const u64 y)
+{
+	u128 r;
+
+	r.i[1] = x.i[1];
+	r.i[0] = x.i[0];
+
+	CAT_PSUB128(r.i[1], r.i[0], y);
+
+	return r;
+}
+
+CAT_INLINE u128 u128_diff(const u128 x, const u128 y)
+{
+	u128 r;
+
+	r.i[1] = x.i[1];
+	r.i[0] = x.i[0];
+
+	CAT_SUB128(r.i[1], r.i[0], y.i[1], y.i[0]);
+
+	return r;
+}
+
+CAT_INLINE void u128_carry_add(u128 &r, const u64 x)
+{
+	const u64 old = r.i[1];
+
+	r.i[0] = old + x;
+	r.i[1] = r.i[0] < old;
+}
+
+CAT_INLINE void u128_borrow_add(u128 &r, const u64 x)
+{
+	const u64 old = r.i[1];
+
+	r.i[0] = old + x;
+	r.i[1] = (r.i[0] < old) - (old >> 63);
+}
+
+CAT_INLINE u128 u128_neg(const u128 x)
+{
+	u128 r;
+
+	r.i[0] = 0;
+	r.i[1] = 0;
+
+	CAT_SUB128(r.i[1], r.i[0], x.i[1], x.i[0]);
+
+	return r;
+}
+
+CAT_INLINE void u128_rshift(u128 &r, int shift)
+{
+	r.i[0] = (r.i[1] << (64 - shift)) | (r.i[0] >> shift);
+	r.i[1] >>= shift;
+}
+
+CAT_INLINE void u128_lshift(u128 &r, int shift)
+{
+	CAT_SHL128(r.i[1], r.i[0], shift);
+}
+
+CAT_INLINE u64 u128_high(const u128 x)
+{
+	return x.i[1];
+}
+
+CAT_INLINE u64 u128_low(const u128 x)
+{
+	return x.i[0];
+}
+
+CAT_INLINE u128 u128_prod(const u64 x, const u64 y)
+{
+	u128 r;
+
+#ifdef CAT_MUL128
+	CAT_MUL128(r.i[1], r.i[0], x, y);
+#else
+	u64 prod, sum;
+
+	prod = CAT_MUL64(x, y);
+
+	u32 lo = (u32)prod;
+
+	prod = CAT_MUL64(x >> 32, y) + (u32)(prod >> 32);
+	sum = (u32)(prod >> 32);
+	prod = CAT_MUL64(x, y >> 32) + (u32)prod;
+	sum += (u32)(prod >> 32);
+
+	r.i[0] = ((u64)( (u32)prod ) << 32) | lo;
+
+	prod = CAT_MUL64(x >> 32, y >> 32) + (u32)sum;
+
+	u32 hi = (u32)(sum >> 32) + (u32)(prod >> 32);
+
+	r.i[1] = ((u64)( hi ) << 32) | (u32)prod;
+#endif
+
+	return r;
+}
+
+CAT_INLINE u128 u128_prod_sum(const u64 x, const u64 y, const u64 z)
+{
+	u128 r;
+
+#ifdef CAT_MUL128
+	CAT_MUL128(r.i[1], r.i[0], x, y);
+	CAT_PADD128(r.i[1], r.i[0], z);
+#else
+	u64 prod, sum;
+
+	prod = CAT_MUL64(x, y) + (u32)z;
+
+	u32 lo = (u32)prod;
+
+	prod = CAT_MUL64(x >> 32, y) + (u32)(prod >> 32) + (u32)(z >> 32);
+	sum = (u32)(prod >> 32);
+	prod = CAT_MUL64(x, y >> 32) + (u32)prod;
+	sum += (u32)(prod >> 32);
+
+	r.i[0] = ((u64)( (u32)prod ) << 32) | lo;
+
+	prod = CAT_MUL64(x >> 32, y >> 32) + (u32)sum;
+
+	u32 hi = (u32)(sum >> 32) + (u32)(prod >> 32);
+
+	r.i[1] = ((u64)( hi ) << 32) | (u32)prod;
+#endif
+
+	return r;
+}
+
+CAT_INLINE u128 u128_prod_63_sum(const u64 x, const u64 y, const u64 z)
+{
+	u128 r;
+
+#ifdef CAT_MUL128
+	CAT_MUL128(r.i[1], r.i[0], x, y);
+	CAT_PADD128(r.i[1], r.i[0], z);
+#else
+	u64 prod;
+
+	prod = CAT_MUL64(x, y) + (u32)z;
+
+	u32 lo = (u32)prod;
+
+	prod = CAT_MUL64(x, y >> 32) + CAT_MUL64(x >> 32, y) + (u32)(prod >> 32) + (u32)(z >> 32);
+
+	r.i[0] = ((u64)( (u32)prod ) << 32) | lo;
+
+	r.i[1] = CAT_MUL64(x >> 32, y >> 32) + (u32)(prod >> 32);
+#endif
+
+	return r;
+}
+
+CAT_INLINE u128 u128_lshift_sum(const u64 x, int shift, const u64 z)
+{
+	u128 r;
+
+	r.i[1] = x >> (64 - shift);
+
+	const u64 old = x << shift;
+
+	r.i[0] = old + z;
+	r.i[1] += (r.i[0] < old);
+
+	return r;
+}
+
+CAT_INLINE bool u128_is_neg(const u128 x)
+{
+	return (s64)x.i[1] < 0;
+}
+
+CAT_INLINE void u128_clear_msb(u128 &r)
+{
+	r.i[1] &= 0x7fffffffffffffffULL;
+}
+
