@@ -1,28 +1,23 @@
-# Snowshoe project layout
+## Tabby Portable Build
+#### Strong, Fast, and Portable Cryptographic Signatures, Handshakes, and Password Authentication
 
-Snowshoe is essentially one large C file, but it has been broken out into pieces so that each one can be separately unit-tested.
+See the full documentation at [https://github.com/catid/tabby](https://github.com/catid/tabby).
 
-~~~
-.
-├── snowshoe.cpp
-├── snowshoe.hpp
-├── ecmul.inc
-├── misc.inc
-├── ecpt.inc
-├── endo.inc
-├── fe.inc
-└── fp.inc
-~~~
+#### Quick Setup
 
-Each file includes the previous one:
+To quickly evaluate Tabby for your application, just include the files in this
+folder and use the API described in "tabby.h".
 
-+ `fp.inc` : Fp finite field arithmetic
-+ `fe.inc` : Fp^2 optimal extension field, includes `fp.inc`
-+ `endo.inc` : Endomorphism implementation, includes `fe.inc`
-+ `ecpt.inc` : Elliptic curve point operations, includes `endo.inc`
-+ `ecmul.inc` : Elliptic curve scalar multiplication, includes `ecpt.inc` and `misc.inc`
-+ `snowshoe.cpp` : Defines library interface
-+ `snowshoe.h` : Declares library interface
+To best incorporate Tabby, edit the Makefile to build for your target and link
+the static library to your application.
 
-This way the unit testers can include e.g. `fp.inc` and use a minimal subset of the code to test those routines.
+The Clang and GCC compilers produce the best code for this library.
+
+#### XCode/iOS
+
+Just add the files to your project and #import "tabby.h".
+
+#### Android
+
+Just add the files to your Android.mk and #include "tabby.h".
 

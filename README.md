@@ -33,10 +33,7 @@ directory contains an easy-to-import set of C code that also
 builds properly for mobile devices.  In a pinch you can use this code for
 desktops, though it will tend to run about 1 microsecond slower.
 
-The GCC and Clang compilers are supported.  The Intel C++ Compiler and Microsoft
-Visual C++ compilers are not supported because they do not support emulated
-128-bit datatypes.  To integrate this library into a project for a compiler
-other than GCC/Clang, generate a static library and link it in that way.
+The Clang and GCC compilers produce the best code for this library.
 
 
 ##### Building: Mac/Linux
