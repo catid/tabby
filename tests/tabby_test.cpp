@@ -281,17 +281,29 @@ int main() {
 
 	cout << "+ Client generated server verifier for password database in " << (c1 - c0) << " cycles, " << (t1 - t0) << " usec (one sample)" << endl;
 
-	t0 = m_clock.usec();
-	c0 = Clock::cycles();
-
 	// Generate challenge message and secret
 	char challenge_secret[288], challenge[80];
-	assert(!tabby_password_challenge(&s, password_verifier, challenge_secret, challenge));
 
-	c1 = Clock::cycles();
-	t1 = m_clock.usec();
+	vector<u32> ty;
+	double wy = 0;
 
-	cout << "+ Server password challenge generated in " << (c1 - c0) << " cycles, " << (t1 - t0) << " usec (one sample)" << endl;
+	for (int ii = 0; ii < 10000; ++ii) {
+		t0 = m_clock.usec();
+		c0 = Clock::cycles();
+
+		assert(!tabby_password_challenge(&s, password_verifier, challenge_secret, challenge));
+
+		c1 = Clock::cycles();
+		t1 = m_clock.usec();
+
+		ty.push_back(c1 - c0);
+		wy += t1 - t0;
+	}
+
+	u32 my = quick_select(&ty[0], (int)ty.size());
+	wy /= ty.size();
+
+	cout << "+ Server password challenge generated in: `" << dec << my << "` median cycles, `" << wy << "` avg usec" << endl;
 
 	t0 = m_clock.usec();
 	c0 = Clock::cycles();
@@ -305,17 +317,29 @@ int main() {
 
 	cout << "+ Client proof of password generated in " << (c1 - c0) << " cycles, " << (t1 - t0) << " usec (one sample)" << endl;
 
-	t0 = m_clock.usec();
-	c0 = Clock::cycles();
-
 	// Generate server proof
 	char server_proof[32];
-	assert(!tabby_password_server_proof(&s, client_proof, challenge_secret, server_proof));
 
-	c1 = Clock::cycles();
-	t1 = m_clock.usec();
+	vector<u32> tz;
+	double wz = 0;
 
-	cout << "+ Server proof of password generated in " << (c1 - c0) << " cycles, " << (t1 - t0) << " usec (one sample)" << endl;
+	for (int ii = 0; ii < 10000; ++ii) {
+		t0 = m_clock.usec();
+		c0 = Clock::cycles();
+
+		assert(!tabby_password_server_proof(&s, client_proof, challenge_secret, server_proof));
+
+		c1 = Clock::cycles();
+		t1 = m_clock.usec();
+
+		tz.push_back(c1 - c0);
+		wz += t1 - t0;
+	}
+
+	u32 mz = quick_select(&tz[0], (int)tz.size());
+	wz /= tz.size();
+
+	cout << "+ Server proof of password generated in: `" << dec << mz << "` median cycles, `" << wz << "` avg usec" << endl;
 
 	t0 = m_clock.usec();
 	c0 = Clock::cycles();
