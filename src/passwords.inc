@@ -392,7 +392,7 @@ int tabby_password_client_proof(tabby_client *C, const void *username, int usern
 		// Z = aX
 	} while (snowshoe_elligator_secret(a, Xp, E, 0, 0, Z));
 
-	// PROOF = BLAKE2(E, SP, Z)
+	// PROOF = BLAKE2(E, X', Y', Z, server_public)
 	char *proof = E + 128 + 64;
 	if (blake2b_init(&B, 64)) {
 		return -1;
