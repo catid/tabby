@@ -1,0 +1,8 @@
+For the TabbyPAKE paper I made a mistake in the 2.2 Background section:
+
+"Despite the assurances made by the AugPAKE authors it is not possible to implement AugPAKE using elliptic
+curve math."
+
+Sorry it turns out I was wrong about that - It works just fine.  In fact the simplicity of AugPAKE is attractive when implemented with elliptic curves.
+
+-Chris
